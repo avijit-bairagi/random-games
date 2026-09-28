@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Random Games Platform</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <div class="logo">
+                <span class="logo-icon">🎮</span>
+                <span class="logo-text">RandomGames <span class="badge">Multiplayer</span></span>
+            </div>
+            <div class="user-info" id="navbarUserInfo">
+                <div class="connection-status connected" id="wsStatusIndicator">
+                    <span class="dot"></span> <span id="wsStatusText">Disconnected</span>
+                </div>
+                <div class="player-badge" id="playerBadge" style="display: none;">
+                    <span class="avatar" id="playerAvatar">👤</span>
+                    <span class="username" id="displayUsername">Guest</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content View Container -->
+        <main class="content-container">
+            <!-- Screen 1: Welcome / Player Name Screen -->
+            <section id="welcomeScreen" class="card welcome-card fade-in">
+                <div class="welcome-header">
+                    <div class="welcome-badge">⚡ Real-Time Multiplayer Arena</div>
+                    <h1 class="welcome-title">Play Instant Multiplayer Games</h1>
+                    <p class="subtitle">Join rooms, challenge friends, and play real-time games with authoritative server matchmaking.</p>
+                </div>
+
+                <div class="welcome-games-showcase">
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">❌</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Tic Tac Toe</span>
+                            <span class="game-chip-players">2 Players</span>
+                        </div>
+                    </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">🎲</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Ludo</span>
+                            <span class="game-chip-players">2 or 4 Players</span>
+                        </div>
+                    </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">🐍</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Snake and Ladder</span>
+                            <span class="game-chip-players">2 - 4 Players</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-container welcome-form">
+                    <div class="input-group">
+                        <label for="usernameInput">Choose Your Player Name</label>
+                        <div class="input-with-icon">
+                            <span class="input-icon">👤</span>
+                            <input type="text" id="usernameInput" placeholder="Enter name (e.g. Neo, Maverick, Shadow)" maxlength="20" autofocus autocomplete="off">
+                        </div>
+                    </div>
+                    <button id="enterPlatformBtn" class="btn btn-primary btn-large btn-glow">Enter Gaming Arena 🚀</button>
+                </div>
+            </section>
+
+            <!-- Screen 2: Games Lobby & Room Selection -->
+            <section id="lobbyScreen" class="screen-view fade-in" style="display: none;">
+                <div class="lobby-header">
+                    <div class="game-tabs" id="gameTabs">
+                        <button class="tab-btn active" data-game="ALL">All Games</button>
+                        <button class="tab-btn" data-game="TIC_TAC_TOE">❌ Tic Tac Toe</button>
+                        <button class="tab-btn" data-game="LUDO">🎲 Ludo</button>
+                        <button class="tab-btn" data-game="SNAKE">🐍 Snake and Ladder</button>
+                    </div>
+                    <div class="lobby-actions">
+                        <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
+                        <button id="openCreateRoomModalBtn" class="btn btn-primary">+ Create Room</button>
+                    </div>
+                </div>
+
+                <div class="lobby-content">
+                    <div class="rooms-container">
+                        <h2>Available Rooms</h2>
+                        <div id="roomList" class="room-grid">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                        <div id="noRoomsPlaceholder" class="empty-placeholder" style="display: none;">
+                            <div class="placeholder-icon">🕹️</div>
+                            <h3>No active rooms found</h3>
+                            <p>Create a room or select another game type to start playing.</p>
+                            <button id="createFirstRoomBtn" class="btn btn-primary">+ Create First Room</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen 3: Game Room View (Waiting & Gameplay) -->
+            <section id="gameRoomScreen" class="screen-view fade-in" style="display: none;">
+                <!-- Room Header -->
+                <div class="room-topbar">
+                    <div class="room-meta">
+                        <button id="leaveRoomBtn" class="btn btn-danger">🚪 Leave Room</button>
+                        <h2 id="roomTitle">Room Name</h2>
+                        <span class="game-tag" id="roomGameType">TIC_TAC_TOE</span>
+                        <span class="status-pill" id="roomStatusPill">Waiting</span>
+                    </div>
+                    <div class="room-controls" id="hostControls">
+                        <button id="startGameBtn" class="btn btn-success btn-large" style="display: none;">▶ Start Game</button>
+                        <button id="restartGameBtn" class="btn btn-warning btn-large" style="display: none;">🔄 Restart Game</button>
+                    </div>
+                </div>
+
+                <div class="game-layout">
+                    <!-- Left: Players list & Game Status -->
+                    <aside class="game-sidebar">
+                        <div class="sidebar-card">
+                            <h3>Players (<span id="playerCount">1</span>/<span id="maxPlayerCount">2</span>)</h3>
+                            <ul id="playersList" class="players-list">
+                                <!-- Populated dynamically -->
+                            </ul>
+                        </div>
+
+                        <div class="sidebar-card">
+                            <h3>Game Details</h3>
+                            <div id="gameStatusDetails" class="game-details-box">
+                                Waiting for players to join...
+                            </div>
+                        </div>
+
+                        <div class="sidebar-card events-card">
+                            <h3>Match Activity</h3>
+                            <div id="eventsLog" class="events-log">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Center/Right: Game Board Canvas / Interactive Area -->
+                    <div class="game-board-area">
+                        <!-- Tic-Tac-Toe Board -->
+                        <div id="ticTacToeBoardContainer" class="board-container" style="display: none;">
+                            <div class="turn-indicator" id="tttTurnIndicator">⏳ Waiting for game to start...</div>
+                            <div class="ttt-grid" id="tttGrid">
+                                <div class="ttt-cell" data-row="0" data-col="0"></div>
+                                <div class="ttt-cell" data-row="0" data-col="1"></div>
+                                <div class="ttt-cell" data-row="0" data-col="2"></div>
+                                <div class="ttt-cell" data-row="1" data-col="0"></div>
+                                <div class="ttt-cell" data-row="1" data-col="1"></div>
+                                <div class="ttt-cell" data-row="1" data-col="2"></div>
+                                <div class="ttt-cell" data-row="2" data-col="0"></div>
+                                <div class="ttt-cell" data-row="2" data-col="1"></div>
+                                <div class="ttt-cell" data-row="2" data-col="2"></div>
+                            </div>
+                        </div>
+
+                        <!-- Ludo Board Canvas -->
+                        <div id="ludoBoardContainer" class="board-container" style="display: none;">
+                            <div class="ludo-turn-box">
+                                <div class="ludo-header-info">
+                                    <div class="turn-indicator" id="ludoTurnIndicator">⏳ Waiting for game to start...</div>
+                                    <div id="ludoMyColorBadge" class="my-side-badge" style="display: none;">You are playing as <span id="ludoMyColorText" class="color-highlight">RED</span></div>
+                                </div>
+                                <div class="dice-roll-container">
+                                    <button id="ludoRollDiceBtn" class="btn btn-primary dice-btn">🎲 Roll Dice</button>
+                                    <div id="ludoDiceCube" class="dice-cube-wrapper">
+                                        <div id="diceResultDisplay" class="dice-face dice-1">
+                                            <span class="pip"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="canvas-wrapper ludo-canvas-wrapper">
+                                <canvas id="ludoCanvas" width="600" height="600"></canvas>
+                                <div id="ludoCenterDiceOverlay" class="center-dice-overlay" style="display: none;">
+                                    <div class="center-dice-box">
+                                        <div class="center-dice-title" id="ludoCenterDiceTitle">Rolling...</div>
+                                        <div class="center-dice-cube-wrapper">
+                                            <div id="ludoCenterDiceDisplay" class="dice-face dice-1">
+                                                <span class="pip"></span>
+                                            </div>
+                                        </div>
+                                        <div class="center-dice-result-text" id="ludoCenterDiceResultText">Rolled a 1</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Snake and Ladder Board Canvas -->
+                        <div id="snakeBoardContainer" class="board-container" style="display: none;">
+                            <div class="ludo-turn-box">
+                                <div class="turn-indicator" id="snakeTurnIndicator">⏳ Waiting for game to start...</div>
+                                <div class="dice-roll-container">
+                                    <button id="snakeRollDiceBtn" class="btn btn-primary dice-btn">🎲 Roll Dice</button>
+                                    <div id="snakeDiceCube" class="dice-cube-wrapper">
+                                        <div id="snakeDiceResultDisplay" class="dice-face dice-1">
+                                            <span class="pip"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="canvas-wrapper snake-canvas-wrapper">
+                                <canvas id="snakeCanvas" width="600" height="600"></canvas>
+                                <div id="snakeCenterDiceOverlay" class="center-dice-overlay" style="display: none;">
+                                    <div class="center-dice-box">
+                                        <div class="center-dice-title" id="snakeCenterDiceTitle">Rolling...</div>
+                                        <div class="center-dice-cube-wrapper">
+                                            <div id="snakeCenterDiceDisplay" class="dice-face dice-1">
+                                                <span class="pip"></span>
+                                            </div>
+                                        </div>
+                                        <div class="center-dice-result-text" id="snakeCenterDiceResultText">Rolled a 1</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="snake-scoreboard" id="snakeScoreboard">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Create Room Modal -->
+        <div id="createRoomModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-icon">✨</span>
+                        <h3>Create Game Room</h3>
+                    </div>
+                    <span class="modal-close" id="closeCreateRoomModalBtn">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label for="roomNameInput">Room Name</label>
+                        <input type="text" id="roomNameInput" placeholder="e.g. Alice's Champions Arena" maxlength="30" autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <label for="gameTypeSelect">Select Game</label>
+                        <select id="gameTypeSelect">
+                            <option value="TIC_TAC_TOE">❌ Tic Tac Toe (2 Players)</option>
+                            <option value="LUDO">🎲 Ludo (2 or 4 Players)</option>
+                            <option value="SNAKE">🐍 Snake and Ladder (2, 3, or 4 Players)</option>
+                        </select>
+                    </div>
+                    <div class="input-group" id="maxPlayersGroup">
+                        <label for="maxPlayersInput">Room Capacity</label>
+                        <select id="maxPlayersInput">
+                            <option value="2">2 Players</option>
+                        </select>
+                    </div>
+                    <div class="input-group-inline custom-checkbox-group">
+                        <input type="checkbox" id="allowSpectatorsCheckbox" checked>
+                        <label for="allowSpectatorsCheckbox">Allow Spectators to watch the game</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelCreateRoomBtn">Cancel</button>
+                    <button class="btn btn-primary btn-glow" id="confirmCreateRoomBtn">✨ Create Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="toast" style="display: none;"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
