@@ -60,6 +60,13 @@
                             <span class="game-chip-players">2 - 4 Players</span>
                         </div>
                     </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">♟️</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Chess</span>
+                            <span class="game-chip-players">2 Players</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-container welcome-form">
@@ -82,6 +89,7 @@
                         <button class="tab-btn" data-game="TIC_TAC_TOE">❌ Tic Tac Toe</button>
                         <button class="tab-btn" data-game="LUDO">🎲 Ludo</button>
                         <button class="tab-btn" data-game="SNAKE">🐍 Snake and Ladder</button>
+                        <button class="tab-btn" data-game="CHESS">♟️ Chess</button>
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
@@ -204,6 +212,40 @@
                             </div>
                         </div>
 
+                        <!-- Chess Board -->
+                        <div id="chessBoardContainer" class="board-container chess-board-container" style="display: none;">
+                            <div class="chess-header">
+                                <div class="turn-indicator" id="chessTurnIndicator">⏳ Waiting for game to start...</div>
+                                <div id="chessMyColorBadge" class="my-side-badge" style="display: none;">You are playing as <span id="chessMyColorText" class="color-highlight">WHITE</span></div>
+                            </div>
+                            <div class="chess-layout">
+                                <div class="chess-board-wrap">
+                                    <div id="chessBoard" class="chess-board"></div>
+                                </div>
+                                <div class="chess-info-panel">
+                                    <div class="chess-captured" id="chessCapturedWhite">
+                                        <div class="chess-captured-label">⬜ White captured:</div>
+                                        <div class="chess-captured-pieces" id="chessCapturedWhitePieces"></div>
+                                    </div>
+                                    <div class="chess-captured" id="chessCapturedBlack">
+                                        <div class="chess-captured-label">⬛ Black captured:</div>
+                                        <div class="chess-captured-pieces" id="chessCapturedBlackPieces"></div>
+                                    </div>
+                                    <div class="chess-move-history" id="chessMoveHistory">
+                                        <div class="chess-move-history-label">📋 Move History</div>
+                                        <div class="chess-move-list" id="chessMoveList"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Promotion Modal -->
+                            <div id="chessPromotionModal" class="chess-promotion-modal" style="display:none;">
+                                <div class="chess-promotion-box">
+                                    <div class="chess-promotion-title">Promote Pawn</div>
+                                    <div class="chess-promotion-choices" id="chessPromotionChoices"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Snake and Ladder Board Canvas -->
                         <div id="snakeBoardContainer" class="board-container" style="display: none;">
                             <div class="board-theme-bar">
@@ -271,6 +313,7 @@
                             <option value="TIC_TAC_TOE">❌ Tic Tac Toe (2 Players)</option>
                             <option value="LUDO">🎲 Ludo (2 or 4 Players)</option>
                             <option value="SNAKE">🐍 Snake and Ladder (2, 3, or 4 Players)</option>
+                            <option value="CHESS">♟️ Chess (2 Players)</option>
                         </select>
                     </div>
                     <div class="input-group" id="maxPlayersGroup">
