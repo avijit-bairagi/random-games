@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,7 +22,11 @@ class ChessGameEngineTest {
 
     @BeforeEach
     void setUp() {
-        engine = new ChessGameEngine();
+        // Use seeded Random so p1 is always assigned white (seed 0: nextBoolean()=false → p1 gets index 1→0 swap, seed 1 gives true)
+        // Instead, use a mock Random that always returns true so players.get(0) is always white
+        engine = new ChessGameEngine(new Random() {
+            @Override public boolean nextBoolean() { return true; }
+        });
         player1 = Player.create("p1", "Alice");
         player2 = Player.create("p2", "Bob");
     }
@@ -49,7 +54,7 @@ class ChessGameEngineTest {
         GameState<ChessState.Details> state = engine.createGame("game-1", List.of(player1, player2), engine.defaultConfiguration());
         ChessState.Details details = (ChessState.Details) state.getDetails();
         String startingPlayerId = details.getCurrentPlayerId();
-        assertTrue(startingPlayerId.equals("p1"));
+        assertEquals("p1", startingPlayerId); // p1 is white (first mover) due to fixed Random
 
         ChessAction action = new ChessAction("MOVE", "e2", "e4", null);
         GameResult result = engine.processAction(state, player1, action);
@@ -67,7 +72,7 @@ class ChessGameEngineTest {
     void shouldRejectMoveFromWrongPlayer() {
         GameState<ChessState.Details> state = engine.createGame("game-1", List.of(player1, player2), engine.defaultConfiguration());
         ChessState.Details details = (ChessState.Details) state.getDetails();
-        assertTrue(details.getCurrentPlayerId().equals("p1"));
+        assertEquals("p1", details.getCurrentPlayerId()); // p1 is white (first mover) due to fixed Random
 
         // player2 tries to move but it's player1's turn
         ChessAction action = new ChessAction("MOVE", "e7", "e5", null);

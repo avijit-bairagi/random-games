@@ -504,6 +504,9 @@ function handleIncomingWsMessage(msg) {
             break;
         case 'PLAYER_RECONNECTED':
             logEvent(`🔄 ${msg.payload.player.username} reconnected.`);
+            if (state.player && msg.payload.player && msg.payload.player.id === state.player.id && msg.payload.room) {
+                updateRoomState(msg.payload.room);
+            }
             break;
         case 'GAME_STARTED':
             snakeTokenPositions = {};
@@ -706,6 +709,8 @@ function updateRoomState(room) {
 
     if (room.gameStateSummary) {
         updateGameState(room.gameStateSummary);
+    } else if (room.gameType === 'CHESS') {
+        renderChess({ status: room.status, details: {} });
     }
 }
 

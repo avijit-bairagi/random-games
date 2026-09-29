@@ -117,7 +117,7 @@ function renderChess(gameState) {
                 el.chessTurnIndicator.textContent = isMyTurn ? '⚠️ You are in Check! Move your King.' : '⚠️ Opponent is in Check!';
                 el.chessTurnIndicator.style.color = 'var(--danger)';
             } else if (isMyTurn) {
-                el.chessTurnIndicator.textContent = `♟ Your Turn (${myColor === 'white' ? '⬜ White' : '⬛ Black'})`;
+                el.chessTurnIndicator.textContent = `♟ Your Turn`;
                 el.chessTurnIndicator.style.color = 'var(--primary)';
             } else {
                 el.chessTurnIndicator.textContent = `⏳ Opponent's Turn...`;

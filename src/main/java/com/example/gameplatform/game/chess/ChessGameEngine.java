@@ -13,6 +13,16 @@ public class ChessGameEngine implements GameEngine<ChessState.Details, ChessActi
 
     private static final String INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+    private final Random random;
+
+    public ChessGameEngine() {
+        this(new Random());
+    }
+
+    public ChessGameEngine(Random random) {
+        this.random = random;
+    }
+
     @Override
     public String gameType() { return "CHESS"; }
 
@@ -38,8 +48,9 @@ public class ChessGameEngine implements GameEngine<ChessState.Details, ChessActi
 
     @Override
     public GameState<ChessState.Details> createGame(String gameId, List<Player> players, ChessConfiguration config) {
-        String whitePlayerId = players.get(0).getId();
-        String blackPlayerId = players.get(1).getId();
+        boolean firstPlayerIsWhite = random.nextBoolean();
+        String whitePlayerId = players.get(firstPlayerIsWhite ? 0 : 1).getId();
+        String blackPlayerId = players.get(firstPlayerIsWhite ? 1 : 0).getId();
 
         ChessState.Details details = ChessState.Details.builder()
                 .fen(INITIAL_FEN)

@@ -42,12 +42,26 @@ public class ChessState implements GameState<ChessState.Details> {
 
     @Override
     public Map<String, Object> toSummary() {
-        return Map.of(
-            "gameId", gameId,
-            "status", status,
-            "winner", winner != null ? winner : "",
-            "currentPlayerId", details != null ? details.getCurrentPlayerId() : ""
-        );
+        Map<String, Object> detailsMap = new java.util.LinkedHashMap<>();
+        if (details != null) {
+            detailsMap.put("fen", details.getFen() != null ? details.getFen() : "");
+            detailsMap.put("currentPlayerId", details.getCurrentPlayerId() != null ? details.getCurrentPlayerId() : "");
+            detailsMap.put("whitePlayerId", details.getWhitePlayerId() != null ? details.getWhitePlayerId() : "");
+            detailsMap.put("blackPlayerId", details.getBlackPlayerId() != null ? details.getBlackPlayerId() : "");
+            detailsMap.put("moveHistory", details.getMoveHistory() != null ? details.getMoveHistory() : List.of());
+            detailsMap.put("isCheck", details.isCheck());
+            detailsMap.put("isCheckmate", details.isCheckmate());
+            detailsMap.put("isDraw", details.isDraw());
+            detailsMap.put("drawReason", details.getDrawReason() != null ? details.getDrawReason() : "");
+        }
+        Map<String, Object> summary = new java.util.LinkedHashMap<>();
+        summary.put("gameId", gameId);
+        summary.put("gameType", "CHESS");
+        summary.put("status", status);
+        summary.put("winner", winner != null ? winner : "");
+        summary.put("sequence", sequence);
+        summary.put("details", detailsMap);
+        return summary;
     }
 
     public void setGameId(String gameId) { this.gameId = gameId; }
