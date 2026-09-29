@@ -1,0 +1,151 @@
+// ======================== LOBBY & UI HELPERS ======================== //
+
+function renderRooms() {
+    const filtered = state.selectedGameTab === 'ALL'
+        ? state.rooms
+        : state.rooms.filter(r => r.gameType === state.selectedGameTab);
+
+    if (filtered.length === 0) {
+        el.roomList.innerHTML = '';
+        el.noRoomsPlaceholder.style.display = 'block';
+        return;
+    }
+
+    el.noRoomsPlaceholder.style.display = 'none';
+    el.roomList.innerHTML = filtered.map(room => {
+        const isAlreadyPlayer = state.player && room.playerIds && room.playerIds.includes(state.player.id);
+        const isAlreadySpectator = state.player && room.spectatorIds && room.spectatorIds.includes(state.player.id);
+        const playerCount = (room.currentPlayersCount != null) ? room.currentPlayersCount : (room.playerIds ? room.playerIds.length : 0);
+        const spectatorCount = (room.spectatorCount != null) ? room.spectatorCount : (room.spectatorIds ? room.spectatorIds.length : 0);
+        const isFull = playerCount >= room.maxPlayers;
+        const isInProgress = room.status === 'IN_PROGRESS';
+        const canJoin = !isAlreadyPlayer && !isFull && (!isInProgress || room.lateJoinAllowed);
+
+        let joinBtn = '';
+        if (isAlreadyPlayer) {
+            joinBtn = `<button class="btn btn-primary" onclick="joinRoom('${room.roomId}', false)">Resume Game</button>`;
+        } else if (canJoin) {
+            joinBtn = `<button class="btn btn-primary" onclick="joinRoom('${room.roomId}', false)">Join Game</button>`;
+        } else if (isFull) {
+            joinBtn = `<button class="btn btn-secondary" disabled>Room Full</button>`;
+        } else if (isInProgress) {
+            joinBtn = `<button class="btn btn-secondary" disabled>In Progress</button>`;
+        }
+
+        let spectateBtn = '';
+        if (room.spectatorAllowed) {
+            if (isAlreadySpectator) {
+                spectateBtn = `<button class="btn btn-secondary" onclick="joinRoom('${room.roomId}', true)">👁️ Watching</button>`;
+            } else {
+                spectateBtn = `<button class="btn btn-secondary" onclick="joinRoom('${room.roomId}', true)">👁️ Spectate</button>`;
+            }
+        }
+
+        return `
+        <div class="room-card">
+            <div class="room-card-header">
+                <span class="room-card-title">${escapeHtml(room.name)}</span>
+                <span class="room-card-badge">${getGameIcon(room.gameType)} ${formatGameType(room.gameType)}</span>
+            </div>
+            <div class="room-card-body">
+                <div class="room-stats-grid">
+                    <div>👥 Players: <strong>${playerCount}/${room.maxPlayers}</strong></div>
+                    <div>👁️ Spectators: <strong>${spectatorCount}</strong></div>
+                </div>
+                <div>Status: <span class="status-pill ${room.status ? room.status.toLowerCase().replace('_', '-') : ''}">${formatStatus(room.status)}</span></div>
+            </div>
+            <div class="room-card-footer">
+                ${spectateBtn}
+                ${joinBtn}
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+window.joinRoom = joinRoom;
+
+function showScreen(screenId) {
+    el.welcomeScreen.style.display = 'none';
+    el.lobbyScreen.style.display = 'none';
+    el.gameRoomScreen.style.display = 'none';
+
+    document.getElementById(screenId).style.display = 'block';
+}
+
+function updateMaxPlayersOptions() {
+    const val = el.gameTypeSelect.value;
+    if (val === 'TIC_TAC_TOE') {
+        el.maxPlayersInput.innerHTML = `<option value="2" selected>2 Players</option>`;
+    } else if (val === 'LUDO') {
+        el.maxPlayersInput.innerHTML = `
+            <option value="2">2 Players</option>
+            <option value="4" selected>4 Players</option>
+        `;
+    } else if (val === 'SNAKE') {
+        el.maxPlayersInput.innerHTML = `
+            <option value="2">2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players</option>
+        `;
+    } else if (val === 'CHESS') {
+        el.maxPlayersInput.innerHTML = `<option value="2" selected>2 Players</option>`;
+    }
+}
+
+function openCreateRoomModal() {
+    updateMaxPlayersOptions();
+    el.createRoomModal.style.display = 'flex';
+}
+
+function closeCreateRoomModal() {
+    el.createRoomModal.style.display = 'none';
+}
+
+function logEvent(msg, type = 'normal') {
+    const time = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${time}] ${msg}`;
+    el.eventsLog.appendChild(entry);
+    el.eventsLog.scrollTop = el.eventsLog.scrollHeight;
+}
+
+function formatGameEvent(evt) {
+    if (evt.eventType === 'MARK_PLACED') {
+        logEvent(`Player marked row ${evt.payload.row + 1}, col ${evt.payload.column + 1} with ${evt.payload.mark}`);
+    } else if (evt.eventType === 'DICE_ROLLED') {
+        logEvent(`🎲 ${evt.payload.player || 'Player'} rolled a ${evt.payload.dice}`);
+    } else if (evt.eventType === 'LADDER_CLIMBED') {
+        logEvent(`🪜 ${evt.payload.player} climbed ladder from ${evt.payload.from} to ${evt.payload.to}!`, 'important');
+    } else if (evt.eventType === 'SNAKE_BITTEN') {
+        logEvent(`🐍 ${evt.payload.player} bitten by snake at ${evt.payload.from}, slid to ${evt.payload.to}!`, 'error');
+    } else if (evt.eventType === 'PLAYER_MOVED') {
+        logEvent(`➡️ ${evt.payload.player} moved to square ${evt.payload.to}`);
+    } else if (evt.eventType === 'BONUS_TURN') {
+        logEvent(`⭐ ${evt.payload.message}`, 'important');
+    } else if (evt.eventType === 'PLAYER_WON') {
+        logEvent(`🏆 ${evt.payload.winner} won the match!`, 'important');
+    } else if (evt.eventType === 'PIECE_CAPTURED') {
+        logEvent(`⚔️ Piece captured at cell ${evt.payload.globalPosition}!`, 'important');
+    }
+}
+
+function showToast(message, type = 'info') {
+    el.toast.textContent = message;
+    el.toast.className = `toast ${type} fade-in`;
+    el.toast.style.display = 'block';
+    setTimeout(() => {
+        el.toast.style.display = 'none';
+    }, 4000);
+}

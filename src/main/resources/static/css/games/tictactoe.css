@@ -1,0 +1,40 @@
+/* Tic Tac Toe Grid */
+.ttt-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-template-rows: repeat(3, 100px);
+    gap: 10px;
+}
+
+.ttt-cell {
+    background-color: var(--bg-dark);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.ttt-cell:hover:not(.occupied) {
+    background-color: var(--bg-card-hover);
+    border-color: var(--primary);
+}
+
+.ttt-cell.mark-X {
+    color: #38bdf8;
+}
+
+.ttt-cell.mark-O {
+    color: #f43f5e;
+}
+
+.ttt-cell.win-cell {
+    background-color: #065f46;
+    border-color: var(--success);
+}
+

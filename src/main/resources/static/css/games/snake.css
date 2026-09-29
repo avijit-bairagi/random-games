@@ -1,0 +1,106 @@
+/* Snake and Ladder Board */
+.board-theme-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.9rem;
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    width: 100%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.theme-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.theme-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: center;
+}
+
+.theme-pill {
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-light);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35rem 0.8rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.theme-pill:hover {
+    background: rgba(51, 65, 85, 0.95);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.theme-pill.active {
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border-color: #a78bfa;
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.55);
+    font-weight: 700;
+}
+
+.snake-scoreboard {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    justify-content: center;
+    width: 100%;
+}
+
+.snake-score-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    background-color: rgba(15, 23, 42, 0.85);
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+}
+
+.snake-score-item.active-turn {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+    transform: translateY(-2px);
+}
+
+.snake-score-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+    border: 2px solid #ffffff;
+}
+
+.snake-controls-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
