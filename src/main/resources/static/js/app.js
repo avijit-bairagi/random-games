@@ -7,6 +7,8 @@ const state = {
     player: null,
     currentRoom: null,
     currentGameState: null,
+    isSpectator: false,
+    lastGameOverShownGameId: null,
     selectedGameTab: 'ALL',
     ws: null,
     wsConnected: false,
@@ -51,12 +53,16 @@ const el = {
     roomTitle: document.getElementById('roomTitle'),
     roomGameType: document.getElementById('roomGameType'),
     roomStatusPill: document.getElementById('roomStatusPill'),
+    roomSpectatorBadge: document.getElementById('roomSpectatorBadge'),
     leaveRoomBtn: document.getElementById('leaveRoomBtn'),
     startGameBtn: document.getElementById('startGameBtn'),
     restartGameBtn: document.getElementById('restartGameBtn'),
     playerCount: document.getElementById('playerCount'),
     maxPlayerCount: document.getElementById('maxPlayerCount'),
     playersList: document.getElementById('playersList'),
+    spectatorsCard: document.getElementById('spectatorsCard'),
+    spectatorCount: document.getElementById('spectatorCount'),
+    spectatorsList: document.getElementById('spectatorsList'),
     gameStatusDetails: document.getElementById('gameStatusDetails'),
     eventsLog: document.getElementById('eventsLog'),
     
@@ -78,6 +84,7 @@ const el = {
     ludoCenterDiceResultText: document.getElementById('ludoCenterDiceResultText'),
     
     snakeBoardContainer: document.getElementById('snakeBoardContainer'),
+    snakeThemeSelector: document.getElementById('snakeThemeSelector'),
     snakeTurnIndicator: document.getElementById('snakeTurnIndicator'),
     snakeRollDiceBtn: document.getElementById('snakeRollDiceBtn'),
     snakeDiceResultDisplay: document.getElementById('snakeDiceResultDisplay'),
@@ -87,6 +94,19 @@ const el = {
     snakeCenterDiceTitle: document.getElementById('snakeCenterDiceTitle'),
     snakeCenterDiceDisplay: document.getElementById('snakeCenterDiceDisplay'),
     snakeCenterDiceResultText: document.getElementById('snakeCenterDiceResultText'),
+
+    // Game Over Modal
+    gameOverModal: document.getElementById('gameOverModal'),
+    gameOverIcon: document.getElementById('gameOverIcon'),
+    gameOverTitle: document.getElementById('gameOverTitle'),
+    gameOverTrophy: document.getElementById('gameOverTrophy'),
+    gameOverWinner: document.getElementById('gameOverWinner'),
+    gameOverSubtitle: document.getElementById('gameOverSubtitle'),
+    gameOverDetails: document.getElementById('gameOverDetails'),
+    gameOverLobbyBtn: document.getElementById('gameOverLobbyBtn'),
+    gameOverRestartBtn: document.getElementById('gameOverRestartBtn'),
+    gameOverCloseBtn: document.getElementById('gameOverCloseBtn'),
+    closeGameOverModalBtn: document.getElementById('closeGameOverModalBtn'),
     
     toast: document.getElementById('toast')
 };
@@ -129,6 +149,7 @@ function setupEventListeners() {
 
     // Tic-Tac-Toe cell click
     el.tttGrid.addEventListener('click', (e) => {
+        if (state.isSpectator) return;
         if (e.target.classList.contains('ttt-cell')) {
             const row = parseInt(e.target.dataset.row);
             const col = parseInt(e.target.dataset.col);
@@ -138,6 +159,7 @@ function setupEventListeners() {
 
     // Ludo Dice button click
     el.ludoRollDiceBtn.addEventListener('click', () => {
+        if (state.isSpectator) return;
         el.ludoRollDiceBtn.disabled = true;
         sendGameAction({ action: 'ROLL_DICE' });
     });
@@ -152,9 +174,26 @@ function setupEventListeners() {
 
     // Snake and Ladder Dice button click
     el.snakeRollDiceBtn.addEventListener('click', () => {
+        if (state.isSpectator) return;
         el.snakeRollDiceBtn.disabled = true;
         sendGameAction({ action: 'ROLL_DICE' });
     });
+
+    // Snake and Ladder Theme selector
+    if (el.snakeThemeSelector) {
+        el.snakeThemeSelector.addEventListener('click', (e) => {
+            const btn = e.target.closest('.theme-pill');
+            if (btn && btn.dataset.theme) {
+                setSnakeBoardTheme(btn.dataset.theme);
+            }
+        });
+    }
+
+    // Game Over Modal buttons
+    if (el.gameOverLobbyBtn) el.gameOverLobbyBtn.addEventListener('click', () => { el.gameOverModal.style.display = 'none'; handleLeaveRoom(); });
+    if (el.gameOverRestartBtn) el.gameOverRestartBtn.addEventListener('click', () => { el.gameOverModal.style.display = 'none'; handleRestartGame(); });
+    if (el.gameOverCloseBtn) el.gameOverCloseBtn.addEventListener('click', () => { el.gameOverModal.style.display = 'none'; });
+    if (el.closeGameOverModalBtn) el.closeGameOverModalBtn.addEventListener('click', () => { el.gameOverModal.style.display = 'none'; });
 }
 
 // ======================== REST API CALLS ======================== //
@@ -313,19 +352,24 @@ async function handleCreateRoom() {
 }
 
 async function joinRoom(roomId, asSpectator = false) {
+    if (!state.player) {
+        showToast('Please enter a username first', 'error');
+        return;
+    }
+
     try {
         const res = await fetch(`/api/v1/games/rooms/${roomId}/join`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 playerId: state.player.id,
-                asSpectator
+                asSpectator: asSpectator
             })
         });
 
         if (res.ok) {
             const room = await res.json();
-            enterRoom(room);
+            enterRoom(room, asSpectator);
         } else {
             const err = await res.json();
             showToast(err.message || 'Failed to join room', 'error');
@@ -344,7 +388,9 @@ function connectWebSocket() {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const roomQuery = state.currentRoom ? `&roomId=${state.currentRoom.roomId}` : '';
-    const wsUrl = `${protocol}//${window.location.host}/ws/game?playerId=${state.player.id}${roomQuery}`;
+    const isSpec = state.isSpectator || (state.player && state.currentRoom && state.currentRoom.spectatorIds && state.currentRoom.spectatorIds.includes(state.player.id));
+    const spectatorQuery = isSpec ? '&asSpectator=true' : '';
+    const wsUrl = `${protocol}//${window.location.host}/ws/game?playerId=${state.player.id}${roomQuery}${spectatorQuery}`;
 
     state.ws = new WebSocket(wsUrl);
 
@@ -354,7 +400,7 @@ function connectWebSocket() {
         el.wsStatusText.textContent = 'Connected';
         
         if (state.currentRoom) {
-            sendWsMessage('JOIN_ROOM', { asSpectator: false });
+            sendWsMessage('JOIN_ROOM', { asSpectator: state.isSpectator });
         }
 
         // Start ping heartbeat
@@ -539,8 +585,12 @@ function updateGameDetailsBox(room, gameState) {
         const winner = gameState ? gameState.winner : null;
         let finishMsg = '';
         if (winner) {
-            const isMe = winner === state.player.id;
-            finishMsg = `🏆 Winner: <strong>${isMe ? 'You' : winner}</strong>!`;
+            const isMe = state.player && winner === state.player.id;
+            const winnerName = (gameState && gameState.details && gameState.details.players && gameState.details.players[winner] && gameState.details.players[winner].username)
+                || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[winner] && gameState.details.playerStates[winner].username)
+                || (room && room.playerNames && room.playerNames[winner])
+                || (isMe ? state.player.username : winner);
+            finishMsg = `🏆 Winner: <strong>${isMe ? 'You (' + escapeHtml(winnerName) + ')' : escapeHtml(winnerName)}</strong>!`;
         } else if (gameState && gameState.status === 'DRAW') {
             finishMsg = `🤝 Match ended in a draw!`;
         } else {
@@ -567,24 +617,35 @@ function updateGameDetailsBox(room, gameState) {
 
 // ======================== ROOM & GAME MANAGEMENT ======================== //
 
-function enterRoom(room) {
+function enterRoom(room, asSpectator = null) {
     state.currentRoom = room;
+    if (asSpectator !== null) {
+        state.isSpectator = asSpectator;
+    } else {
+        state.isSpectator = !!(state.player && room && room.spectatorIds && room.spectatorIds.includes(state.player.id));
+    }
+    localStorage.setItem('game_platform_as_spectator', state.isSpectator ? 'true' : 'false');
     if (room && room.gameStateSummary) {
         state.currentGameState = room.gameStateSummary;
     }
     snakeTokenPositions = {};
+    ludoTokenPositions = {};
     localStorage.setItem('game_platform_room_id', room.roomId);
     showScreen('gameRoomScreen');
     updateRoomState(room);
 
     // Inform backend WebSocket that player is active in room
-    sendWsMessage('JOIN_ROOM', { asSpectator: false });
+    sendWsMessage('JOIN_ROOM', { asSpectator: state.isSpectator });
 }
 
 function updateRoomState(room) {
     state.currentRoom = room;
     if (room && room.roomId) {
         localStorage.setItem('game_platform_room_id', room.roomId);
+    }
+    if (state.player && room) {
+        state.isSpectator = !!(room.spectatorIds && room.spectatorIds.includes(state.player.id));
+        localStorage.setItem('game_platform_as_spectator', state.isSpectator ? 'true' : 'false');
     }
     if (room && room.gameStateSummary) {
         state.currentGameState = room.gameStateSummary;
@@ -594,11 +655,15 @@ function updateRoomState(room) {
     el.roomStatusPill.textContent = formatStatus(room.status);
     el.roomStatusPill.className = `status-pill ${room.status ? room.status.toLowerCase().replace('_', '-') : ''}`;
 
-    el.playerCount.textContent = room.playerIds.length;
+    if (el.roomSpectatorBadge) {
+        el.roomSpectatorBadge.style.display = state.isSpectator ? 'inline-flex' : 'none';
+    }
+
+    el.playerCount.textContent = room.playerIds ? room.playerIds.length : 0;
     el.maxPlayerCount.textContent = room.maxPlayers;
 
-    // Show host start button if host and in WAITING/READY state
-    const isHost = state.player && room && state.player.id === room.hostPlayerId;
+    // Show host start button if host and in WAITING/READY state and not spectator
+    const isHost = state.player && room && state.player.id === room.hostPlayerId && !state.isSpectator;
     if (isHost && (room.status === 'READY' || room.status === 'WAITING')) {
         el.startGameBtn.style.display = 'inline-block';
         el.startGameBtn.disabled = room.playerIds.length < room.minPlayers;
@@ -615,6 +680,7 @@ function updateRoomState(room) {
     }
 
     renderPlayersList(room.playerIds);
+    renderSpectatorsList(room.spectatorIds);
     setupGameBoardView(room.gameType);
     updateGameDetailsBox(room, room.gameStateSummary || state.currentGameState);
 
@@ -634,6 +700,7 @@ function handleRestartGame() {
         return;
     }
     snakeTokenPositions = {};
+    ludoTokenPositions = {};
     sendWsMessage('RESTART_GAME');
 }
 
@@ -641,21 +708,30 @@ function handleLeaveRoom() {
     if (!state.currentRoom) return;
     sendWsMessage('LEAVE_ROOM');
     localStorage.removeItem('game_platform_room_id');
+    localStorage.removeItem('game_platform_as_spectator');
     state.currentRoom = null;
+    state.isSpectator = false;
     showScreen('lobbyScreen');
     fetchRooms();
 }
 
 function renderPlayersList(playerIds) {
+    if (!el.playersList) return;
+    const list = playerIds || [];
     let ludoPlayerStates = null;
     const currentGState = state.currentGameState || (state.currentRoom ? state.currentRoom.gameStateSummary : null);
     if (currentGState && currentGState.details && currentGState.details.playerStates) {
         ludoPlayerStates = currentGState.details.playerStates;
     }
 
-    el.playersList.innerHTML = playerIds.map(id => {
-        const isSelf = id === state.player.id;
+    el.playersList.innerHTML = list.map(id => {
+        const isSelf = state.player && id === state.player.id;
         const isHost = state.currentRoom && id === state.currentRoom.hostPlayerId;
+        const name = (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[id])
+            || (currentGState && currentGState.details && currentGState.details.players && currentGState.details.players[id] && currentGState.details.players[id].username)
+            || (currentGState && currentGState.details && currentGState.details.playerStates && currentGState.details.playerStates[id] && currentGState.details.playerStates[id].username)
+            || (isSelf ? state.player.username : id);
+
         let colorBadge = '';
         if (ludoPlayerStates && ludoPlayerStates[id]) {
             const c = ludoPlayerStates[id].color;
@@ -665,8 +741,32 @@ function renderPlayersList(playerIds) {
 
         return `
             <li class="player-item">
-                <span>${colorBadge}${isHost ? '👑 ' : ''}${isSelf ? '<strong>You</strong>' : id}</span>
+                <span>${colorBadge}${isHost ? '👑 ' : ''}${isSelf ? `<strong>You (${escapeHtml(name)})</strong>` : escapeHtml(name)}</span>
                 <span class="status-dot"></span>
+            </li>
+        `;
+    }).join('');
+}
+
+function renderSpectatorsList(spectatorIds) {
+    if (!el.spectatorsList) return;
+    const list = spectatorIds || [];
+    if (el.spectatorCount) {
+        el.spectatorCount.textContent = list.length;
+    }
+    if (list.length === 0) {
+        el.spectatorsList.innerHTML = '<li class="player-item muted" style="color:var(--text-muted); font-size:0.85rem;">No spectators</li>';
+        return;
+    }
+    el.spectatorsList.innerHTML = list.map(id => {
+        const isSelf = state.player && id === state.player.id;
+        const name = (state.currentRoom && state.currentRoom.spectatorNames && state.currentRoom.spectatorNames[id])
+            || (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[id])
+            || (isSelf ? state.player.username : id);
+        return `
+            <li class="player-item">
+                <span>👁️ ${isSelf ? `<strong>You (${escapeHtml(name)})</strong>` : escapeHtml(name)}</span>
+                <span class="status-dot" style="background-color:#8b5cf6;"></span>
             </li>
         `;
     }).join('');
@@ -715,7 +815,7 @@ function updateGameState(gameState, events) {
     }
 
     const type = gameState.gameType || (state.currentRoom ? state.currentRoom.gameType : null);
-    const isHost = state.player && state.currentRoom && state.player.id === state.currentRoom.hostPlayerId;
+    const isHost = state.player && state.currentRoom && state.player.id === state.currentRoom.hostPlayerId && !state.isSpectator;
 
     if (gameState.status === 'FINISHED' || gameState.status === 'DRAW') {
         if (state.currentRoom) {
@@ -729,6 +829,7 @@ function updateGameState(gameState, events) {
                 el.restartGameBtn.style.display = 'none';
             }
         }
+        showGameOverModal(gameState, type);
     } else if (gameState.status === 'IN_PROGRESS') {
         if (state.currentRoom) {
             state.currentRoom.status = gameState.status;
@@ -746,6 +847,7 @@ function updateGameState(gameState, events) {
     if (state.currentRoom) {
         updateGameDetailsBox(state.currentRoom, gameState);
         renderPlayersList(state.currentRoom.playerIds);
+        renderSpectatorsList(state.currentRoom.spectatorIds);
     }
 
     if (type === 'TIC_TAC_TOE') {
@@ -755,6 +857,68 @@ function updateGameState(gameState, events) {
     } else if (type === 'SNAKE') {
         renderSnake(gameState, events);
     }
+}
+
+function showGameOverModal(gameState, gameType) {
+    if (!el.gameOverModal || !gameState) return;
+    const isFinished = gameState.status === 'FINISHED';
+    const isDraw = gameState.status === 'DRAW';
+    if (!isFinished && !isDraw) return;
+
+    const matchId = (gameState.gameId || (state.currentRoom ? state.currentRoom.roomId : '')) + '_' + (gameState.sequence || 0) + '_' + gameState.status;
+    if (state.lastGameOverShownGameId === matchId) return;
+    state.lastGameOverShownGameId = matchId;
+
+    const winnerId = gameState.winner;
+    const isWinner = state.player && winnerId && winnerId === state.player.id;
+    const isSpectator = state.isSpectator;
+    const isHost = state.player && state.currentRoom && state.player.id === state.currentRoom.hostPlayerId && !state.isSpectator;
+
+    const winnerName = (gameState && gameState.details && gameState.details.players && gameState.details.players[winnerId] && gameState.details.players[winnerId].username)
+        || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[winnerId] && gameState.details.playerStates[winnerId].username)
+        || (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[winnerId])
+        || (isWinner ? state.player.username : winnerId);
+
+    if (isDraw) {
+        if (el.gameOverIcon) el.gameOverIcon.textContent = '🤝';
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '⚖️';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = 'Match Drawn!';
+        if (el.gameOverWinner) el.gameOverWinner.textContent = "It's a Draw!";
+        if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Both sides demonstrated equal skill and strategy!';
+    } else if (isWinner) {
+        if (el.gameOverIcon) el.gameOverIcon.textContent = '🏆';
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '👑';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = 'Victory! 🎉';
+        if (el.gameOverWinner) el.gameOverWinner.textContent = 'You Won!';
+        if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Outstanding performance! Congratulations on your victory!';
+    } else if (isSpectator) {
+        if (el.gameOverIcon) el.gameOverIcon.textContent = '🏁';
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '🏆';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = 'Match Finished!';
+        if (el.gameOverWinner) el.gameOverWinner.textContent = `${winnerName ? escapeHtml(winnerName) : 'Player'} Won!`;
+        if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Game concluded. Spectator mode active.';
+    } else {
+        if (el.gameOverIcon) el.gameOverIcon.textContent = '🏁';
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '👑';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = 'Game Over';
+        if (el.gameOverWinner) el.gameOverWinner.textContent = `${winnerName ? escapeHtml(winnerName) : 'Winner'} Wins!`;
+        if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Great match! Better luck next time.';
+    }
+
+    if (el.gameOverDetails) {
+        let detailsHtml = `<strong>${getGameIcon(gameType)} ${formatGameType(gameType)}</strong>`;
+        if (winnerName) {
+            detailsHtml += ` &bull; Winner: <span style="color:var(--accent); font-weight:700;">${escapeHtml(winnerName)}</span>`;
+        }
+        el.gameOverDetails.innerHTML = detailsHtml;
+    }
+
+    if (el.gameOverRestartBtn) {
+        el.gameOverRestartBtn.style.display = isHost ? 'inline-block' : 'none';
+        el.gameOverRestartBtn.disabled = state.currentRoom && state.currentRoom.playerIds.length < state.currentRoom.minPlayers;
+    }
+
+    el.gameOverModal.style.display = 'flex';
 }
 
 // ======================== TIC-TAC-TOE RENDERER ======================== //
@@ -768,8 +932,10 @@ function renderTicTacToe(gameState) {
 
     // Update Turn Indicator
     if (gameState.status === 'FINISHED') {
+        const winnerName = (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[gameState.winner])
+            || (gameState.winner === state.player.id ? state.player.username : gameState.winner);
         el.tttTurnIndicator.textContent = gameState.winner 
-            ? `🏆 ${gameState.winner === state.player.id ? 'You Won!' : 'Winner: ' + gameState.winner}`
+            ? `🏆 ${gameState.winner === state.player.id ? 'You Won!' : 'Winner: ' + escapeHtml(winnerName)}`
             : 'Game Finished';
         el.tttTurnIndicator.style.color = 'var(--success)';
     } else if (gameState.status === 'DRAW') {
@@ -896,7 +1062,7 @@ function initLudoCanvas() {
 }
 
 function handleLudoCanvasHover(e) {
-    if (!state.currentRoom || !state.player) {
+    if (!state.currentRoom || !state.player || state.isSpectator) {
         el.ludoCanvas.style.cursor = 'default';
         return;
     }
@@ -926,6 +1092,9 @@ function handleLudoCanvasHover(e) {
     const cs = 40;
     let isHoveringMovable = false;
     for (const idx of details.movablePieceIndices) {
+        const p = pState.pieces ? pState.pieces[idx] : null;
+        if (p && (p.isFinished || p.finished || p.step >= 57)) continue;
+
         const tokenKey = `${pState.color}_${idx}`;
         let pos = currentRenderedLudoTokens[tokenKey];
         if (!pos) {
@@ -938,7 +1107,11 @@ function handleLudoCanvasHover(e) {
 
         const dist = Math.hypot(mouseX - pos.x, mouseY - pos.y);
         const badgeDist = Math.hypot(mouseX - pos.x, mouseY - (pos.y - 21));
-        if (Math.min(dist, badgeDist) <= 34) {
+        let baseDist = Infinity;
+        if (pos.baseX !== undefined && pos.baseY !== undefined) {
+            baseDist = Math.hypot(mouseX - pos.baseX, mouseY - pos.baseY);
+        }
+        if (Math.min(dist, badgeDist, baseDist) <= 34) {
             isHoveringMovable = true;
             break;
         }
@@ -950,7 +1123,7 @@ function handleLudoCanvasTap(e) {
     const now = Date.now();
     if (now - lastLudoTapTime < 200) return; // Debounce rapid pointer/click triggers
 
-    if (!state.currentRoom || !state.player) return;
+    if (!state.currentRoom || !state.player || state.isSpectator) return;
     const gameState = state.currentGameState || (state.currentRoom ? state.currentRoom.gameStateSummary : null);
     if (!gameState || gameState.status !== 'IN_PROGRESS') return;
     const details = gameState.details || gameState;
@@ -983,6 +1156,9 @@ function handleLudoCanvasTap(e) {
     let bestDist = 42; // Generous tap radius for desktop and mobile
 
     for (const idx of details.movablePieceIndices) {
+        const p = pState.pieces ? pState.pieces[idx] : null;
+        if (p && (p.isFinished || p.finished || p.step >= 57)) continue;
+
         const tokenKey = `${pState.color}_${idx}`;
         let pos = currentRenderedLudoTokens[tokenKey];
         if (!pos) {
@@ -995,7 +1171,11 @@ function handleLudoCanvasTap(e) {
 
         const dist = Math.hypot(clickX - pos.x, clickY - pos.y);
         const badgeDist = Math.hypot(clickX - pos.x, clickY - (pos.y - 21));
-        const effectiveDist = Math.min(dist, badgeDist);
+        let baseDist = Infinity;
+        if (pos.baseX !== undefined && pos.baseY !== undefined) {
+            baseDist = Math.hypot(clickX - pos.baseX, clickY - pos.baseY);
+        }
+        const effectiveDist = Math.min(dist, badgeDist, baseDist);
 
         if (effectiveDist < bestDist) {
             bestDist = effectiveDist;
@@ -1011,6 +1191,7 @@ function handleLudoCanvasTap(e) {
 }
 
 function checkAndTriggerLudoAutoPlay(gameState) {
+    if (state.isSpectator) return;
     if (!gameState || gameState.status !== 'IN_PROGRESS' || !state.player) return;
     const details = gameState.details || gameState;
     if (details.currentPlayerId !== state.player.id || details.turnPhase !== 'MOVING') {
@@ -1023,11 +1204,28 @@ function checkAndTriggerLudoAutoPlay(gameState) {
 
     if (isLudoDiceRolling || isLudoAnimating) return;
 
-    if (details.movablePieceIndices && details.movablePieceIndices.length === 1) {
-        const turnKey = `${details.currentPlayerId}_${details.turnNumber || ''}_${details.lastDiceRoll}_${details.movablePieceIndices[0]}`;
+    const pState = details.playerStates ? details.playerStates[state.player.id] : null;
+    if (!pState || !details.movablePieceIndices || details.movablePieceIndices.length === 0) return;
+
+    // Filter out finished pieces
+    const movableIndices = details.movablePieceIndices.filter(idx => {
+        const p = pState.pieces ? pState.pieces[idx] : null;
+        return p && !p.isFinished && !p.finished && p.step < 57;
+    });
+
+    if (movableIndices.length === 0) return;
+
+    const movablePieces = movableIndices.map(idx => pState.pieces[idx]).filter(Boolean);
+
+    // Check if there is only 1 movable piece OR all movable pieces share identical step & yard state
+    const firstP = movablePieces[0];
+    const allSamePosition = movablePieces.every(p => p.step === firstP.step && p.inYard === firstP.inYard);
+
+    if (movableIndices.length === 1 || allSamePosition) {
+        const pieceIdx = movableIndices[0];
+        const turnKey = `${details.currentPlayerId}_seq${gameState.sequence || 0}_roll${details.lastDiceRoll}_idx${pieceIdx}`;
         if (lastAutoMovedTurnKey === turnKey) return;
 
-        const pieceIdx = details.movablePieceIndices[0];
         lastAutoMovedTurnKey = turnKey;
 
         if (ludoAutoMoveTimer) clearTimeout(ludoAutoMoveTimer);
@@ -1038,10 +1236,54 @@ function checkAndTriggerLudoAutoPlay(gameState) {
     }
 }
 
+function syncLudoTokenPositions(details) {
+    if (!details || !details.playerStates) return;
+    const cs = 40;
+    Object.values(details.playerStates).forEach(ps => {
+        const pColor = ps.color;
+        ps.pieces.forEach((p, idx) => {
+            const tokenKey = `${pColor}_${idx}`;
+            const isFinished = p.finished || p.isFinished || p.step >= 57;
+            if (p.inYard || p.step < 0) {
+                const yardPos = getLudoYardCoordinate(pColor, idx, cs);
+                ludoTokenPositions[tokenKey] = {
+                    x: yardPos.x,
+                    y: yardPos.y,
+                    inYard: true,
+                    currentStep: -1,
+                    finished: false
+                };
+            } else if (isFinished) {
+                const goalPos = getLudoGoalCoordinate(pColor, idx, cs);
+                ludoTokenPositions[tokenKey] = {
+                    x: goalPos.x,
+                    y: goalPos.y,
+                    inYard: false,
+                    currentStep: 57,
+                    finished: true
+                };
+            } else if (!isLudoAnimating || !ludoTokenPositions[tokenKey]) {
+                const trackPos = getLudoBoardCoordinate(pColor, p.step, cs);
+                ludoTokenPositions[tokenKey] = {
+                    x: trackPos.x,
+                    y: trackPos.y,
+                    inYard: false,
+                    currentStep: p.step,
+                    finished: false
+                };
+            }
+        });
+    });
+}
+
 function updateLudoUI(gameState) {
     const details = gameState.details || gameState;
     const isMyTurn = details.currentPlayerId === state.player.id;
     const color = details.currentColor;
+
+    if (!isMyTurn || details.turnPhase === 'ROLLING') {
+        lastAutoMovedTurnKey = null;
+    }
 
     // Detect current player's assigned color in this game
     let myColor = null;
@@ -1073,7 +1315,18 @@ function updateLudoUI(gameState) {
         el.ludoTurnIndicator.style.color = 'var(--text-muted)';
         el.ludoRollDiceBtn.disabled = true;
     } else {
-        const isSingleAuto = isMyTurn && details.turnPhase === 'MOVING' && details.movablePieceIndices && details.movablePieceIndices.length === 1;
+        const pState = (details.playerStates && state.player) ? details.playerStates[state.player.id] : null;
+        let isSingleAuto = false;
+        if (isMyTurn && details.turnPhase === 'MOVING' && pState && details.movablePieceIndices && details.movablePieceIndices.length > 0) {
+            const movablePieces = details.movablePieceIndices.map(idx => pState.pieces[idx]).filter(Boolean);
+            if (movablePieces.length === 1) {
+                isSingleAuto = true;
+            } else if (movablePieces.length > 1) {
+                const firstP = movablePieces[0];
+                isSingleAuto = movablePieces.every(p => p.step === firstP.step && p.inYard === firstP.inYard);
+            }
+        }
+
         el.ludoTurnIndicator.textContent = isMyTurn 
             ? (details.turnPhase === 'ROLLING' ? 'Your Turn - Roll Dice 🎲' : (isSingleAuto ? 'Auto Moving...' : '👉 Tap your highlighted piece to move'))
             : `${color}'s Turn (${details.turnPhase === 'ROLLING' ? 'Rolling...' : 'Moving...'})`;
@@ -1092,6 +1345,29 @@ async function renderLudo(gameState, events) {
     const details = gameState.details || gameState;
     if (!ludoCtx) initLudoCanvas();
 
+    // 1. Process capture events immediately so target piece is reset to yard instantly in tracking
+    if (events && events.length > 0) {
+        events.forEach(evt => {
+            if (evt.eventType === 'PIECE_CAPTURED' && evt.payload) {
+                const capColor = evt.payload.capturedColor;
+                const capIdx = evt.payload.capturedPieceIndex;
+                if (capColor && capIdx !== undefined) {
+                    const capKey = `${capColor}_${capIdx}`;
+                    const yardPos = getLudoYardCoordinate(capColor, capIdx, 40);
+                    ludoTokenPositions[capKey] = {
+                        x: yardPos.x,
+                        y: yardPos.y,
+                        inYard: true,
+                        currentStep: -1,
+                        finished: false
+                    };
+                }
+            }
+        });
+    }
+
+    syncLudoTokenPositions(details);
+
     // Check for dice roll event
     const diceEvt = events && events.find(e => e.eventType === 'DICE_ROLLED');
     if (diceEvt && diceEvt.payload && diceEvt.payload.dice !== undefined) {
@@ -1099,6 +1375,7 @@ async function renderLudo(gameState, events) {
         const rollerColor = rollerState ? rollerState.color : 'Player';
         const rollerName = details.players && details.players[diceEvt.playerId] ? details.players[diceEvt.playerId].username : `${rollerColor}`;
         triggerDiceRollAnimation('LUDO', `${rollerName} (${rollerColor})`, diceEvt.payload.dice, () => {
+            syncLudoTokenPositions(details);
             drawLudoBoard(details);
             updateLudoUI(gameState);
         });
@@ -1110,6 +1387,7 @@ async function renderLudo(gameState, events) {
     if (moveEvt && moveEvt.payload) {
         await animateLudoMove(gameState, moveEvt);
     } else {
+        syncLudoTokenPositions(details);
         drawLudoBoard(details);
         updateLudoUI(gameState);
     }
@@ -1119,7 +1397,7 @@ async function animateLudoMove(gameState, moveEvt) {
     const details = gameState.details || gameState;
     const pColor = moveEvt.payload.color;
     const pieceIdx = moveEvt.payload.pieceIndex;
-    const targetStep = (moveEvt.eventType === 'PIECE_ENTERED_TRACK') ? 0 : moveEvt.payload.step || (moveEvt.eventType === 'PIECE_REACHED_HOME' ? 57 : 0);
+    const targetStep = (moveEvt.eventType === 'PIECE_ENTERED_TRACK') ? 0 : (moveEvt.eventType === 'PIECE_REACHED_HOME' ? 57 : (moveEvt.payload.step || 0));
 
     const tokenKey = `${pColor}_${pieceIdx}`;
     const tokenInfo = ludoTokenPositions[tokenKey] || { inYard: true, currentStep: -1 };
@@ -1141,13 +1419,13 @@ async function animateLudoMove(gameState, moveEvt) {
                     const hop = Math.sin(t * Math.PI) * 20;
                     const x = yardCoord.x + (startCoord.x - yardCoord.x) * t;
                     const y = yardCoord.y + (startCoord.y - yardCoord.y) * t - hop;
-                    ludoTokenPositions[tokenKey] = { x, y, currentStep: 0, inYard: false };
+                    ludoTokenPositions[tokenKey] = { x, y, currentStep: 0, inYard: false, finished: false };
                     drawLudoBoard(details);
                 }, resolve);
             });
         } else if (startStep >= 0 && targetStep > startStep) {
             // Step-by-step tile hopping
-            for (let s = startStep + 1; s <= targetStep; s++) {
+            for (let s = startStep + 1; s <= Math.min(targetStep, 56); s++) {
                 const p1 = getLudoBoardCoordinate(pColor, s - 1, cs);
                 const p2 = getLudoBoardCoordinate(pColor, s, cs);
 
@@ -1156,7 +1434,23 @@ async function animateLudoMove(gameState, moveEvt) {
                         const hop = Math.sin(t * Math.PI) * 16;
                         const x = p1.x + (p2.x - p1.x) * t;
                         const y = p1.y + (p2.y - p1.y) * t - hop;
-                        ludoTokenPositions[tokenKey] = { x, y, currentStep: s, inYard: false };
+                        ludoTokenPositions[tokenKey] = { x, y, currentStep: s, inYard: false, finished: false };
+                        drawLudoBoard(details);
+                    }, resolve);
+                });
+            }
+
+            if (targetStep >= 57) {
+                // Animate entering home goal
+                const p56 = getLudoBoardCoordinate(pColor, 56, cs);
+                const pGoal = getLudoGoalCoordinate(pColor, pieceIdx, cs);
+
+                await new Promise(resolve => {
+                    runAnimation(300, (t) => {
+                        const hop = Math.sin(t * Math.PI) * 14;
+                        const x = p56.x + (pGoal.x - p56.x) * t;
+                        const y = p56.y + (pGoal.y - p56.y) * t - hop;
+                        ludoTokenPositions[tokenKey] = { x, y, currentStep: 57, inYard: false, finished: true };
                         drawLudoBoard(details);
                     }, resolve);
                 });
@@ -1164,19 +1458,35 @@ async function animateLudoMove(gameState, moveEvt) {
         }
 
         // Update final position
-        ludoTokenPositions[tokenKey] = {
-            inYard: false,
-            currentStep: targetStep,
-            ...getLudoBoardCoordinate(pColor, targetStep, cs)
-        };
+        if (targetStep >= 57) {
+            const goalCoord = getLudoGoalCoordinate(pColor, pieceIdx, cs);
+            ludoTokenPositions[tokenKey] = {
+                inYard: false,
+                currentStep: 57,
+                finished: true,
+                x: goalCoord.x,
+                y: goalCoord.y
+            };
+        } else {
+            const trackCoord = getLudoBoardCoordinate(pColor, targetStep, cs);
+            ludoTokenPositions[tokenKey] = {
+                inYard: false,
+                currentStep: targetStep,
+                finished: false,
+                x: trackCoord.x,
+                y: trackCoord.y
+            };
+        }
     } finally {
         isLudoAnimating = false;
+        syncLudoTokenPositions(details);
         drawLudoBoard(details);
         updateLudoUI(gameState);
     }
 }
 
 window.makeLudoMove = function(pieceIndex) {
+    if (state.isSpectator) return;
     sendGameAction({ action: 'MOVE_PIECE', pieceIndex });
 };
 
@@ -1271,8 +1581,6 @@ function drawLudoBoard(details) {
     drawColoredTrackCell(ctx, 6 * cs, 13 * cs, cs, colors.BLUE, '★ BLUE START');
 
     // 4. Safe Star Emblems on Global Track (8 Safe Squares)
-    // Red Start [1,6], Green Start [8,1], Yellow Start [13,8], Blue Start [6,13]
-    // Star cells: [6,2], [12,6], [8,12], [2,8]
     const safeCells = [
         [1, 6], [8, 1], [13, 8], [6, 13],
         [6, 2], [12, 6], [8, 12], [2, 8]
@@ -1286,35 +1594,124 @@ function drawLudoBoard(details) {
 
     // 6. Draw Tokens
     if (details && details.playerStates) {
+        const tokenList = [];
+
         Object.values(details.playerStates).forEach(ps => {
             const pColor = ps.color;
             const pieceColor = colors[pColor] || '#000';
-            const isUserOwner = ps.playerId === state.player.id;
+            const isUserOwner = state.player && ps.playerId === state.player.id;
             const isTurnOwner = ps.playerId === details.currentPlayerId;
 
             ps.pieces.forEach((p, idx) => {
                 const tokenKey = `${pColor}_${idx}`;
-                let x, y;
+                const isFinished = p.finished || p.isFinished || p.step >= 57;
+                const isMovable = !isFinished && !state.isSpectator && isUserOwner && isTurnOwner && 
+                                  details.turnPhase === 'MOVING' && 
+                                  details.movablePieceIndices && details.movablePieceIndices.includes(idx);
+                
+                let locKey;
+                let baseX, baseY;
 
-                if (ludoTokenPositions[tokenKey] && isLudoAnimating) {
-                    x = ludoTokenPositions[tokenKey].x;
-                    y = ludoTokenPositions[tokenKey].y;
-                } else if (p.inYard) {
+                if (ludoTokenPositions[tokenKey] && isLudoAnimating && !isFinished) {
+                    locKey = `anim_${tokenKey}`;
+                    baseX = ludoTokenPositions[tokenKey].x;
+                    baseY = ludoTokenPositions[tokenKey].y;
+                } else if (p.inYard || p.step < 0) {
+                    locKey = `yard_${pColor}_${idx}`;
                     const yardPos = getLudoYardCoordinate(pColor, idx, cs);
-                    x = yardPos.x;
-                    y = yardPos.y;
+                    baseX = yardPos.x;
+                    baseY = yardPos.y;
+                } else if (isFinished) {
+                    locKey = `goal_${pColor}_${idx}`;
+                    const goalPos = getLudoGoalCoordinate(pColor, idx, cs);
+                    baseX = goalPos.x;
+                    baseY = goalPos.y;
                 } else {
                     const coord = getLudoBoardCoordinate(pColor, p.step, cs);
-                    x = coord.x;
-                    y = coord.y;
+                    locKey = `coord_${Math.round(coord.x)}_${Math.round(coord.y)}`;
+                    baseX = coord.x;
+                    baseY = coord.y;
                 }
 
-                currentRenderedLudoTokens[tokenKey] = { x, y };
-
-                const isMovable = isUserOwner && isTurnOwner && details.turnPhase === 'MOVING' && details.movablePieceIndices && details.movablePieceIndices.includes(idx);
-
-                drawLudoToken(ctx, x, y, pieceColor, idx + 1, isUserOwner, isTurnOwner, isMovable);
+                tokenList.push({
+                    pColor,
+                    idx,
+                    tokenKey,
+                    piece: p,
+                    pieceColor,
+                    isUserOwner,
+                    isTurnOwner,
+                    isMovable,
+                    isFinished,
+                    locKey,
+                    baseX,
+                    baseY
+                });
             });
+        });
+
+        // Group by location key to apply multi-piece offsets
+        const grouped = {};
+        tokenList.forEach(item => {
+            if (!grouped[item.locKey]) grouped[item.locKey] = [];
+            grouped[item.locKey].push(item);
+        });
+
+        const multiOffsets2 = [
+            { x: -6, y: -6, scale: 0.88 },
+            { x: 6, y: 6, scale: 0.88 }
+        ];
+        const multiOffsets3 = [
+            { x: 0, y: -7, scale: 0.8 },
+            { x: -7, y: 6, scale: 0.8 },
+            { x: 7, y: 6, scale: 0.8 }
+        ];
+        const multiOffsets4 = [
+            { x: -7, y: -7, scale: 0.75 },
+            { x: 7, y: -7, scale: 0.75 },
+            { x: -7, y: 7, scale: 0.75 },
+            { x: 7, y: 7, scale: 0.75 }
+        ];
+
+        tokenList.forEach(item => {
+            const group = grouped[item.locKey];
+            let offsetX = 0;
+            let offsetY = 0;
+            let scale = 1.0;
+
+            if (group && group.length > 1 && !item.locKey.startsWith('anim_') && !item.locKey.startsWith('goal_')) {
+                const itemIdx = group.indexOf(item);
+                let off;
+                if (group.length === 2) {
+                    off = multiOffsets2[itemIdx];
+                } else if (group.length === 3) {
+                    off = multiOffsets3[itemIdx];
+                } else {
+                    off = multiOffsets4[itemIdx % 4];
+                }
+                if (off) {
+                    offsetX = off.x;
+                    offsetY = off.y;
+                    scale = off.scale;
+                }
+            }
+
+            const finalX = item.baseX + offsetX;
+            const finalY = item.baseY + offsetY;
+
+            currentRenderedLudoTokens[item.tokenKey] = {
+                x: finalX,
+                y: finalY,
+                baseX: item.baseX,
+                baseY: item.baseY,
+                scale: scale,
+                isMovable: item.isMovable,
+                isFinished: item.isFinished,
+                idx: item.idx,
+                pColor: item.pColor
+            };
+
+            drawLudoToken(ctx, finalX, finalY, item.pieceColor, item.isFinished ? '★' : (item.idx + 1), item.isUserOwner, item.isTurnOwner, item.isMovable, scale, item.isFinished);
         });
     }
 }
@@ -1506,22 +1903,24 @@ function drawLudoCenterFinish(ctx, cs, colors) {
     ctx.restore();
 }
 
-function drawLudoToken(ctx, x, y, color, label, isUserOwner, isTurnOwner, isMovable) {
+function drawLudoToken(ctx, x, y, color, label, isUserOwner, isTurnOwner, isMovable, scale = 1.0, isFinished = false) {
     ctx.save();
 
+    const baseRadius = (isFinished ? 12 : 15) * scale;
+
     // Movable candidate highlighting & pulsing indicator
-    if (isMovable) {
+    if (isMovable && !isFinished) {
         // Outer glowing halo
         ctx.beginPath();
-        ctx.arc(x, y, 24, 0, Math.PI * 2);
+        ctx.arc(x, y, 22 * scale, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(251, 191, 36, 0.35)';
         ctx.fill();
 
         // Pulsing border
         ctx.beginPath();
-        ctx.arc(x, y, 21, 0, Math.PI * 2);
+        ctx.arc(x, y, 19 * scale, 0, Math.PI * 2);
         ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = Math.max(2, 3 * scale);
         ctx.setLineDash([4, 2]);
         ctx.stroke();
         ctx.setLineDash([]);
@@ -1529,53 +1928,55 @@ function drawLudoToken(ctx, x, y, color, label, isUserOwner, isTurnOwner, isMova
         // Small "TAP" badge above candidate token
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
-        ctx.roundRect(x - 14, y - 28, 28, 14, 4);
+        const bw = 26 * scale;
+        const bh = 13 * scale;
+        ctx.roundRect(x - bw / 2, y - baseRadius - bh - 2, bw, bh, 3);
         ctx.fill();
 
         ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 9px Inter, sans-serif';
+        ctx.font = `bold ${Math.max(8, Math.round(9 * scale))}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('TAP', x, y - 21);
-    } else if (isTurnOwner) {
+        ctx.fillText('TAP', x, y - baseRadius - bh / 2 - 2);
+    } else if (isTurnOwner && !isFinished) {
         ctx.beginPath();
-        ctx.arc(x, y, 19, 0, Math.PI * 2);
+        ctx.arc(x, y, 18 * scale, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.fill();
     }
 
     // Drop shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = 5 * scale;
     ctx.shadowOffsetX = 1;
-    ctx.shadowOffsetY = 3;
+    ctx.shadowOffsetY = 2 * scale;
 
     // 3D Sphere fill
     ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI * 2);
+    ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
 
     ctx.shadowColor = 'transparent';
 
-    // White rim border (or golden rim if movable)
-    ctx.lineWidth = isMovable ? 3 : 2.5;
-    ctx.strokeStyle = isMovable ? '#fef08a' : (isUserOwner ? '#ffffff' : '#e2e8f0');
+    // White rim border (or golden rim if movable or finished)
+    ctx.lineWidth = isMovable ? Math.max(2, 3 * scale) : (isFinished ? Math.max(1.5, 2 * scale) : Math.max(1.5, 2.5 * scale));
+    ctx.strokeStyle = isFinished ? '#fbbf24' : (isMovable ? '#fef08a' : (isUserOwner ? '#ffffff' : '#e2e8f0'));
     ctx.stroke();
 
     // Specular 3D highlight
-    const highlight = ctx.createRadialGradient(x - 4, y - 5, 1, x, y, 15);
+    const highlight = ctx.createRadialGradient(x - 3 * scale, y - 4 * scale, 1, x, y, baseRadius);
     highlight.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
     highlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
     highlight.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
     ctx.fillStyle = highlight;
     ctx.beginPath();
-    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.arc(x, y, baseRadius - 1, 0, Math.PI * 2);
     ctx.fill();
 
-    // Piece Label (Number)
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px Inter, sans-serif';
+    // Piece Label (Number or Star)
+    ctx.fillStyle = isFinished ? '#fbbf24' : '#ffffff';
+    ctx.font = `bold ${Math.max(9, Math.round((isFinished ? 12 : 11) * scale))}px Inter, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
@@ -1583,6 +1984,27 @@ function drawLudoToken(ctx, x, y, color, label, isUserOwner, isTurnOwner, isMova
     ctx.fillText(label, x, y);
 
     ctx.restore();
+}
+
+function getLudoGoalCoordinate(color, pieceIndex, cs) {
+    const offsets = [
+        { ox: -7, oy: -7 },
+        { ox: 7, oy: -7 },
+        { ox: -7, oy: 7 },
+        { ox: 7, oy: 7 }
+    ];
+    const off = offsets[pieceIndex % 4];
+
+    if (color === 'RED') {
+        return { x: 6.8 * cs + off.ox * 0.6, y: 7.5 * cs + off.oy * 0.6 };
+    } else if (color === 'GREEN') {
+        return { x: 7.5 * cs + off.ox * 0.6, y: 6.8 * cs + off.oy * 0.6 };
+    } else if (color === 'YELLOW') {
+        return { x: 8.2 * cs + off.ox * 0.6, y: 7.5 * cs + off.oy * 0.6 };
+    } else if (color === 'BLUE') {
+        return { x: 7.5 * cs + off.ox * 0.6, y: 8.2 * cs + off.oy * 0.6 };
+    }
+    return { x: 7.5 * cs + off.ox, y: 7.5 * cs + off.oy };
 }
 
 function getLudoYardCoordinate(color, pieceIndex, cs) {
@@ -1642,10 +2064,200 @@ function getLudoBoardCoordinate(color, step, cs) {
 let snakeCtx = null;
 let snakeTokenPositions = {}; // playerId -> { x, y, currentPos }
 let isSnakeAnimating = false;
+let currentSnakeTheme = localStorage.getItem('snake_board_theme') || 'classic';
+
+// ======================== 5 BOARD TEMPLATES / THEMES ======================== //
+
+const SNAKE_TEMPLATES = {
+    classic: {
+        id: 'classic',
+        name: 'Classic Royal',
+        frameBg: '#1e130c',
+        frameBorder: '#b45309',
+        cornerAccent: '#f59e0b',
+        tileA: ['#ffffff', '#f8fafc'],
+        tileB: ['#f4ede2', '#e9decb'],
+        gridColor: '#cbd5e1',
+        textStyle: '#5c4838',
+        textFont: '600 11px Inter, Georgia, sans-serif',
+        tile1: { bg: ['#dcfce7', '#bbf7d0'], border: '#15803d', label: 'START 1', icon: '▶' },
+        tile100: { bg: ['#fef08a', '#f59e0b'], border: '#b45309', label: 'GOAL 100', icon: '👑' },
+        ladder: {
+            type: 'mahogany',
+            rail: '#78350f',
+            railHighlight: '#fde047',
+            rung: '#b45309',
+            rungCap: '#fde047'
+        },
+        species: [
+            { name: 'Eastern Diamondback', dorsalDark: '#3e2723', dorsalMain: '#6d4c41', dorsalLight: '#a1887f', belly: '#f5f5dc', spots: '#271610', spotBorder: '#fff8e1', eyeColor: '#ffb300', tongue: '#e53935', pattern: 'diamond' },
+            { name: 'Emerald Tree Boa', dorsalDark: '#064e3b', dorsalMain: '#059669', dorsalLight: '#34d399', belly: '#fef08a', spots: '#ffffff', spotBorder: '#022c22', eyeColor: '#facc15', tongue: '#dc2626', pattern: 'lightning' },
+            { name: 'Scarlet Coral Snake', dorsalDark: '#7f1d1d', dorsalMain: '#dc2626', dorsalLight: '#f87171', belly: '#fee2e2', spots: '#0f172a', spotBorder: '#fbbf24', eyeColor: '#fbbf24', tongue: '#b91c1c', pattern: 'bands' },
+            { name: 'Royal Golden Python', dorsalDark: '#78350f', dorsalMain: '#d97706', dorsalLight: '#fcd34d', belly: '#fef3c7', spots: '#451a03', spotBorder: '#fef08a', eyeColor: '#f59e0b', tongue: '#ef4444', pattern: 'rosette' },
+            { name: 'Blue Pit Viper', dorsalDark: '#075985', dorsalMain: '#0284c7', dorsalLight: '#38bdf8', belly: '#bae6fd', spots: '#082f49', spotBorder: '#e0f2fe', eyeColor: '#f43f5e', tongue: '#e11d48', pattern: 'viper' },
+            { name: 'Black King Cobra', dorsalDark: '#0f172a', dorsalMain: '#1e293b', dorsalLight: '#475569', belly: '#94a3b8', spots: '#cbd5e1', spotBorder: '#334155', eyeColor: '#f59e0b', tongue: '#ef4444', pattern: 'chevron' }
+        ]
+    },
+    jungle: {
+        id: 'jungle',
+        name: 'Jungle Safari',
+        frameBg: '#052e16',
+        frameBorder: '#16a34a',
+        cornerAccent: '#4ade80',
+        tileA: ['#f0fdf4', '#dcfce7'],
+        tileB: ['#bbf7d0', '#86efac'],
+        gridColor: '#4ade80',
+        textStyle: '#14532d',
+        textFont: '700 11px Inter, sans-serif',
+        tile1: { bg: ['#86efac', '#22c55e'], border: '#14532d', label: 'CAMP 1', icon: '🏕️' },
+        tile100: { bg: ['#fef08a', '#eab308'], border: '#854d0e', label: 'TEMPLE 100', icon: '🏆' },
+        ladder: {
+            type: 'bamboo',
+            rail: '#3f6212',
+            railHighlight: '#bef264',
+            rung: '#65a30d',
+            rungCap: '#a3e635'
+        },
+        species: [
+            { name: 'Amazonian Green Boa', dorsalDark: '#064e3b', dorsalMain: '#10b981', dorsalLight: '#6ee7b7', belly: '#fef08a', spots: '#ecfdf5', spotBorder: '#022c22', eyeColor: '#fde047', tongue: '#dc2626', pattern: 'lightning' },
+            { name: 'Crimson Rainforest Viper', dorsalDark: '#881337', dorsalMain: '#e11d48', dorsalLight: '#fb7185', belly: '#ffe4e6', spots: '#4c0519', spotBorder: '#fbcfe8', eyeColor: '#fbbf24', tongue: '#9f1239', pattern: 'diamond' },
+            { name: 'Yellow-Lipped Tree Viper', dorsalDark: '#713f12', dorsalMain: '#eab308', dorsalLight: '#fde047', belly: '#fef9c3', spots: '#422006', spotBorder: '#fef08a', eyeColor: '#ef4444', tongue: '#dc2626', pattern: 'rosette' },
+            { name: 'Jungle Tiger Python', dorsalDark: '#78350f', dorsalMain: '#ea580c', dorsalLight: '#fdba74', belly: '#ffedd5', spots: '#431407', spotBorder: '#fed7aa', eyeColor: '#facc15', tongue: '#ea580c', pattern: 'bands' },
+            { name: 'Emerald Bush Viper', dorsalDark: '#022c22', dorsalMain: '#059669', dorsalLight: '#34d399', belly: '#a7f3d0', spots: '#064e3b', spotBorder: '#d1fae5', eyeColor: '#f43f5e', tongue: '#e11d48', pattern: 'viper' },
+            { name: 'Night Stalker Krait', dorsalDark: '#020617', dorsalMain: '#0f172a', dorsalLight: '#334155', belly: '#64748b', spots: '#f1f5f9', spotBorder: '#94a3b8', eyeColor: '#eab308', tongue: '#ef4444', pattern: 'chevron' }
+        ]
+    },
+    neon: {
+        id: 'neon',
+        name: 'Neon Cyber',
+        frameBg: '#090d16',
+        frameBorder: '#06b6d4',
+        cornerAccent: '#ec4899',
+        tileA: ['#0f172a', '#1e293b'],
+        tileB: ['#0b1120', '#151e33'],
+        gridColor: 'rgba(56, 189, 248, 0.3)',
+        textStyle: '#38bdf8',
+        textFont: 'bold 11px "Courier New", monospace',
+        tile1: { bg: ['#064e3b', '#059669'], border: '#34d399', label: 'NODE 1', icon: '⚡' },
+        tile100: { bg: ['#581c87', '#9333ea'], border: '#c084fc', label: 'CORE 100', icon: '👑' },
+        ladder: {
+            type: 'cyber',
+            rail: '#0284c7',
+            railHighlight: '#38bdf8',
+            rung: '#ec4899',
+            rungCap: '#06b6d4'
+        },
+        species: [
+            { name: 'Plasma Cyan Wyrm', dorsalDark: '#083344', dorsalMain: '#06b6d4', dorsalLight: '#67e8f9', belly: '#cffafe', spots: '#ec4899', spotBorder: '#f472b6', eyeColor: '#f43f5e', tongue: '#ec4899', pattern: 'lightning' },
+            { name: 'Synthwave Magenta Cobra', dorsalDark: '#4a044e', dorsalMain: '#d946ef', dorsalLight: '#f0abfc', belly: '#fae8ff', spots: '#06b6d4', spotBorder: '#67e8f9', eyeColor: '#38bdf8', tongue: '#06b6d4', pattern: 'diamond' },
+            { name: 'Neon Electric Viper', dorsalDark: '#14532d', dorsalMain: '#22c55e', dorsalLight: '#86efac', belly: '#dcfce7', spots: '#facc15', spotBorder: '#fef08a', eyeColor: '#f43f5e', tongue: '#e11d48', pattern: 'bands' },
+            { name: 'Quantum Violet Python', dorsalDark: '#3b0764', dorsalMain: '#9333ea', dorsalLight: '#c084fc', belly: '#f3e8ff', spots: '#38bdf8', spotBorder: '#a5f3fc', eyeColor: '#facc15', tongue: '#06b6d4', pattern: 'rosette' },
+            { name: 'Laser Amber Serpent', dorsalDark: '#7c2d12', dorsalMain: '#f97316', dorsalLight: '#fdba74', belly: '#ffedd5', spots: '#06b6d4', spotBorder: '#e0f2fe', eyeColor: '#38bdf8', tongue: '#38bdf8', pattern: 'viper' },
+            { name: 'Dark Net Stalker', dorsalDark: '#020617', dorsalMain: '#1e1b4b', dorsalLight: '#4338ca', belly: '#818cf8', spots: '#f43f5e', spotBorder: '#fda4af', eyeColor: '#06b6d4', tongue: '#f43f5e', pattern: 'chevron' }
+        ]
+    },
+    desert: {
+        id: 'desert',
+        name: 'Desert Oasis',
+        frameBg: '#27170a',
+        frameBorder: '#d97706',
+        cornerAccent: '#fbbf24',
+        tileA: ['#fffbeb', '#fef3c7'],
+        tileB: ['#fde68a', '#fcd34d'],
+        gridColor: '#d97706',
+        textStyle: '#78350f',
+        textFont: '600 11px Georgia, serif',
+        tile1: { bg: ['#ecfdf5', '#a7f3d0'], border: '#059669', label: 'OASIS 1', icon: '🌴' },
+        tile100: { bg: ['#f59e0b', '#b45309'], border: '#78350f', label: 'PYRAMID 100', icon: '👑' },
+        ladder: {
+            type: 'gilded',
+            rail: '#92400e',
+            railHighlight: '#fde047',
+            rung: '#d97706',
+            rungCap: '#fbbf24'
+        },
+        species: [
+            { name: 'Saharan Horned Asp', dorsalDark: '#451a03', dorsalMain: '#b45309', dorsalLight: '#fde047', belly: '#fef3c7', spots: '#78350f', spotBorder: '#fef9c3', eyeColor: '#dc2626', tongue: '#b91c1c', pattern: 'diamond' },
+            { name: 'Gilded Egyptian Cobra', dorsalDark: '#78350f', dorsalMain: '#d97706', dorsalLight: '#fcd34d', belly: '#fffbeb', spots: '#0f172a', spotBorder: '#fef08a', eyeColor: '#ef4444', tongue: '#dc2626', pattern: 'chevron' },
+            { name: 'Sunfire Desert Viper', dorsalDark: '#7c2d12', dorsalMain: '#ea580c', dorsalLight: '#fdba74', belly: '#ffedd5', spots: '#431407', spotBorder: '#fef08a', eyeColor: '#eab308', tongue: '#b91c1c', pattern: 'bands' },
+            { name: 'Dune Sand Boa', dorsalDark: '#713f12', dorsalMain: '#ca8a04', dorsalLight: '#facc15', belly: '#fef9c3', spots: '#3e2723', spotBorder: '#fffde7', eyeColor: '#dc2626', tongue: '#ea580c', pattern: 'rosette' },
+            { name: 'Red Sea Coral Snake', dorsalDark: '#881337', dorsalMain: '#e11d48', dorsalLight: '#fda4af', belly: '#ffe4e6', spots: '#0f172a', spotBorder: '#fde047', eyeColor: '#facc15', tongue: '#9f1239', pattern: 'bands' },
+            { name: 'Terracotta Sidewinder', dorsalDark: '#5c1d11', dorsalMain: '#c2410c', dorsalLight: '#fb923c', belly: '#ffedd5', spots: '#431407', spotBorder: '#fed7aa', eyeColor: '#fde047', tongue: '#991b1b', pattern: 'viper' }
+        ]
+    },
+    frost: {
+        id: 'frost',
+        name: 'Arctic Frost',
+        frameBg: '#082f49',
+        frameBorder: '#38bdf8',
+        cornerAccent: '#bae6fd',
+        tileA: ['#f0f9ff', '#e0f2fe'],
+        tileB: ['#bae6fd', '#7dd3fc'],
+        gridColor: '#0284c7',
+        textStyle: '#0369a1',
+        textFont: '700 11px Inter, sans-serif',
+        tile1: { bg: ['#dbeafe', '#93c5fd'], border: '#2563eb', label: 'BASE 1', icon: '❄️' },
+        tile100: { bg: ['#fef9c3', '#fde047'], border: '#ca8a04', label: 'PEAK 100', icon: '👑' },
+        ladder: {
+            type: 'steel',
+            rail: '#0369a1',
+            railHighlight: '#e0f2fe',
+            rung: '#0284c7',
+            rungCap: '#e0f2fe'
+        },
+        species: [
+            { name: 'Arctic Diamond Viper', dorsalDark: '#0c4a6e', dorsalMain: '#0284c7', dorsalLight: '#bae6fd', belly: '#f0f9ff', spots: '#ffffff', spotBorder: '#0369a1', eyeColor: '#f43f5e', tongue: '#e11d48', pattern: 'diamond' },
+            { name: 'Glacial Ice Wyrm', dorsalDark: '#1e1b4b', dorsalMain: '#6366f1', dorsalLight: '#a5b4fc', belly: '#e0e7ff', spots: '#38bdf8', spotBorder: '#e0f2fe', eyeColor: '#facc15', tongue: '#ec4899', pattern: 'lightning' },
+            { name: 'Frostbite White Cobra', dorsalDark: '#334155', dorsalMain: '#94a3b8', dorsalLight: '#f1f5f9', belly: '#ffffff', spots: '#0284c7', spotBorder: '#7dd3fc', eyeColor: '#38bdf8', tongue: '#0284c7', pattern: 'chevron' },
+            { name: 'Aurora Sky Serpent', dorsalDark: '#064e3b', dorsalMain: '#10b981', dorsalLight: '#67e8f9', belly: '#cffafe', spots: '#ec4899', spotBorder: '#f472b6', eyeColor: '#fbbf24', tongue: '#f43f5e', pattern: 'bands' },
+            { name: 'Deep Blizzard Python', dorsalDark: '#0f172a', dorsalMain: '#38bdf8', dorsalLight: '#e0f2fe', belly: '#f8fafc', spots: '#0369a1', spotBorder: '#bae6fd', eyeColor: '#f43f5e', tongue: '#ef4444', pattern: 'rosette' },
+            { name: 'Crystal Blue Viper', dorsalDark: '#075985', dorsalMain: '#0ea5e9', dorsalLight: '#7dd3fc', belly: '#e0f2fe', spots: '#ffffff', spotBorder: '#0284c7', eyeColor: '#fbbf24', tongue: '#e11d48', pattern: 'viper' }
+        ]
+    }
+};
+
+function setSnakeBoardTheme(themeName) {
+    if (!SNAKE_TEMPLATES[themeName]) return;
+    currentSnakeTheme = themeName;
+    localStorage.setItem('snake_board_theme', themeName);
+
+    if (el.snakeThemeSelector) {
+        el.snakeThemeSelector.querySelectorAll('.theme-pill').forEach(btn => {
+            if (btn.dataset.theme === themeName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    const currentGState = state.currentGameState || (state.currentRoom ? state.currentRoom.gameStateSummary : null);
+    drawSnakeLudoBoard(currentGState ? currentGState.details : null);
+}
 
 function initSnakeCanvas() {
-    snakeCtx = el.snakeCanvas.getContext('2d');
-    drawSnakeLudoBoard(null);
+    if (!el.snakeCanvas) return;
+    const canvas = el.snakeCanvas;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 600 * dpr;
+    canvas.height = 600 * dpr;
+    canvas.style.width = '600px';
+    canvas.style.height = '600px';
+    snakeCtx = canvas.getContext('2d');
+    snakeCtx.scale(dpr, dpr);
+
+    if (el.snakeThemeSelector) {
+        el.snakeThemeSelector.querySelectorAll('.theme-pill').forEach(btn => {
+            if (btn.dataset.theme === currentSnakeTheme) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    const currentGState = state.currentGameState || (state.currentRoom ? state.currentRoom.gameStateSummary : null);
+    drawSnakeLudoBoard(currentGState ? currentGState.details : null);
 }
 
 function getSnakeLudoCellCenter(num) {
@@ -1682,9 +2294,14 @@ function getSnakeControlPoints(headTile, tailTile) {
     const dist = Math.hypot(dx, dy) || 1;
     const nx = -dy / dist;
     const ny = dx / dist;
-    const curveAmp = Math.min(45, dist * 0.22);
-    const cp1 = { x: pHead.x + dx * 0.33 + nx * curveAmp, y: pHead.y + dy * 0.33 + ny * curveAmp };
-    const cp2 = { x: pHead.x + dx * 0.66 - nx * curveAmp, y: pHead.y + dy * 0.66 - ny * curveAmp };
+
+    // Organic S-curve sinuous wave control points
+    const side = (headTile % 2 === 0) ? 1 : -1;
+    const curveAmp1 = Math.min(48, Math.max(22, dist * 0.28)) * side;
+    const curveAmp2 = Math.min(42, Math.max(18, dist * 0.22)) * -side;
+
+    const cp1 = { x: pHead.x + dx * 0.35 + nx * curveAmp1, y: pHead.y + dy * 0.35 + ny * curveAmp1 };
+    const cp2 = { x: pHead.x + dx * 0.70 + nx * curveAmp2, y: pHead.y + dy * 0.70 + ny * curveAmp2 };
     return { pHead, cp1, cp2, pTail };
 }
 
@@ -1721,6 +2338,8 @@ function updateSnakeUI(gameState) {
     const isMyTurn = details.currentPlayerId === state.player.id;
     const currPlayer = players[details.currentPlayerId];
     const currName = currPlayer ? currPlayer.username : 'Player';
+    const myData = state.player && players[state.player.id];
+    const isFinishedMe = myData && myData.position >= 100;
 
     if (gameState.status === 'FINISHED') {
         const winnerName = (gameState.winner && players[gameState.winner]) ? players[gameState.winner].username : gameState.winner;
@@ -1734,6 +2353,11 @@ function updateSnakeUI(gameState) {
             ? '⚡ Ready! Host can start the game'
             : '⏳ Waiting for players to join...';
         el.snakeTurnIndicator.style.color = 'var(--text-muted)';
+        el.snakeRollDiceBtn.disabled = true;
+    } else if (isFinishedMe) {
+        const myRank = myData.rank > 0 ? ` (Rank #${myData.rank})` : '';
+        el.snakeTurnIndicator.textContent = `🎉 You finished${myRank}! Spectating match...`;
+        el.snakeTurnIndicator.style.color = 'var(--success)';
         el.snakeRollDiceBtn.disabled = true;
     } else {
         el.snakeTurnIndicator.textContent = isMyTurn 
@@ -1754,10 +2378,15 @@ function updateSnakeUI(gameState) {
         if (!p) return '';
         const isCurrent = pid === details.currentPlayerId && gameState.status === 'IN_PROGRESS';
         const isWinner = pid === gameState.winner;
+        const isMe = state.player && pid === state.player.id;
+        const rankBadge = p.rank > 0 
+            ? `<span style="background:rgba(245,158,11,0.2); color:#f59e0b; padding:2px 7px; border-radius:10px; font-weight:700; font-size:0.75rem; border:1px solid rgba(245,158,11,0.4);">Rank #${p.rank}</span>` 
+            : '';
         return `
             <div class="snake-score-item ${isCurrent ? 'active-turn' : ''}">
                 <span class="snake-score-dot" style="background-color: ${p.color}"></span>
-                <span>${pid === state.player.id ? 'You (' + p.username + ')' : p.username}: <strong>Square ${p.position}</strong></span>
+                <span>${isMe ? '👑 You (' + escapeHtml(p.username) + ')' : escapeHtml(p.username)}: <strong>Square ${p.position}</strong></span>
+                ${rankBadge}
                 ${isWinner ? '<span>🏆 WINNER</span>' : ''}
                 ${!p.active ? '<span style="color:var(--danger)">(LEFT)</span>' : ''}
             </div>
@@ -1912,59 +2541,135 @@ async function renderSnake(gameState, events) {
     updateSnakeUI(gameState);
 }
 
+// ======================== REALISTIC BOARD DRAWING ENGINE ======================== //
+
 function drawSnakeLudoBoard(details) {
     if (!snakeCtx) return;
     const ctx = snakeCtx;
     const w = 600;
     const h = 600;
     const cs = 60;
+    const theme = SNAKE_TEMPLATES[currentSnakeTheme] || SNAKE_TEMPLATES.classic;
 
     ctx.clearRect(0, 0, w, h);
 
-    // Outer Board Border Glow
-    ctx.fillStyle = '#0f172a';
+    // 1. Board Outer Frame & Shadow
+    ctx.save();
+    ctx.fillStyle = theme.frameBg;
     ctx.fillRect(0, 0, w, h);
 
-    // Draw 100 cells with gradients and borders
-    const tileColorsA = ['#ffffff', '#f8fafc'];
-    const tileColorsB = ['#f1f5f9', '#e2e8f0'];
-    const specialColors = {
-        1: '#dcfce7',  // Start Greenish
-        100: '#fef08a' // Win Gold
-    };
+    // Bevel frame border
+    ctx.strokeStyle = theme.frameBorder;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
 
+    // Frame Corner Brackets
+    ctx.strokeStyle = theme.cornerAccent;
+    ctx.lineWidth = 3;
+    const cornerSize = 18;
+    // Top-Left
+    ctx.beginPath();
+    ctx.moveTo(4, 4 + cornerSize); ctx.lineTo(4, 4); ctx.lineTo(4 + cornerSize, 4); ctx.stroke();
+    // Top-Right
+    ctx.beginPath();
+    ctx.moveTo(w - 4 - cornerSize, 4); ctx.lineTo(w - 4, 4); ctx.lineTo(w - 4, 4 + cornerSize); ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath();
+    ctx.moveTo(4, h - 4 - cornerSize); ctx.lineTo(4, h - 4); ctx.lineTo(4 + cornerSize, h - 4); ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath();
+    ctx.moveTo(w - 4 - cornerSize, h - 4); ctx.lineTo(w - 4, h - 4); ctx.lineTo(w - 4, h - 4 - cornerSize); ctx.stroke();
+    ctx.restore();
+
+    // 2. Draw 100 Grid Cells
     for (let num = 1; num <= 100; num++) {
         const cell = getSnakeLudoCellCenter(num);
         const isEven = (cell.row + cell.col) % 2 === 0;
 
         ctx.save();
-        if (specialColors[num]) {
-            ctx.fillStyle = specialColors[num];
+
+        if (num === 1) {
+            // Special Tile 1: Start Launchpad
+            const g1 = ctx.createLinearGradient(cell.left, cell.top, cell.left + cs, cell.top + cs);
+            g1.addColorStop(0, theme.tile1.bg[0]);
+            g1.addColorStop(1, theme.tile1.bg[1]);
+            ctx.fillStyle = g1;
+            ctx.fillRect(cell.left, cell.top, cs, cs);
+
+            ctx.strokeStyle = theme.tile1.border;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cell.left + 1, cell.top + 1, cs - 2, cs - 2);
+
+            ctx.fillStyle = theme.tile1.border;
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${theme.tile1.icon} 1`, cell.x, cell.top + 14);
+            ctx.font = '800 9px Inter, sans-serif';
+            ctx.fillText('START', cell.x, cell.top + 46);
+        } else if (num === 100) {
+            // Special Tile 100: Grand Victory Goal
+            const g100 = ctx.createRadialGradient(cell.x, cell.y, 4, cell.x, cell.y, 35);
+            g100.addColorStop(0, theme.tile100.bg[0]);
+            g100.addColorStop(1, theme.tile100.bg[1]);
+            ctx.fillStyle = g100;
+            ctx.fillRect(cell.left, cell.top, cs, cs);
+
+            ctx.strokeStyle = theme.tile100.border;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(cell.left + 1, cell.top + 1, cs - 2, cs - 2);
+
+            // Sunburst star rays
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+            ctx.lineWidth = 1;
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                ctx.beginPath();
+                ctx.moveTo(cell.x, cell.y);
+                ctx.lineTo(cell.x + Math.cos(a) * 22, cell.y + Math.sin(a) * 22);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = theme.tile100.border;
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${theme.tile100.icon} 100`, cell.x, cell.top + 14);
+            ctx.font = '800 9px Inter, sans-serif';
+            ctx.fillText('WINNER', cell.x, cell.top + 46);
         } else {
+            // Regular Checkered Tile
             const grad = ctx.createLinearGradient(cell.left, cell.top, cell.left + cs, cell.top + cs);
             if (isEven) {
-                grad.addColorStop(0, tileColorsA[0]);
-                grad.addColorStop(1, tileColorsA[1]);
+                grad.addColorStop(0, theme.tileA[0]);
+                grad.addColorStop(1, theme.tileA[1]);
             } else {
-                grad.addColorStop(0, tileColorsB[0]);
-                grad.addColorStop(1, tileColorsB[1]);
+                grad.addColorStop(0, theme.tileB[0]);
+                grad.addColorStop(1, theme.tileB[1]);
             }
             ctx.fillStyle = grad;
+            ctx.fillRect(cell.left, cell.top, cs, cs);
+
+            // Grid Border
+            ctx.strokeStyle = theme.gridColor;
+            ctx.lineWidth = 0.75;
+            ctx.strokeRect(cell.left + 0.5, cell.top + 0.5, cs - 1, cs - 1);
+
+            // Subtle inner bevel highlight on top/left
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(cell.left + 1, cell.top + cs - 1);
+            ctx.lineTo(cell.left + 1, cell.top + 1);
+            ctx.lineTo(cell.left + cs - 1, cell.top + 1);
+            ctx.stroke();
+
+            // Cell Number
+            ctx.fillStyle = theme.textStyle;
+            ctx.font = theme.textFont;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(num.toString(), cell.left + 4, cell.top + 4);
         }
 
-        ctx.fillRect(cell.left, cell.top, cs, cs);
-
-        // Grid border
-        ctx.strokeStyle = '#cbd5e1';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(cell.left + 0.5, cell.top + 0.5, cs - 1, cs - 1);
-
-        // Cell Number
-        ctx.fillStyle = num === 100 ? '#b45309' : (num === 1 ? '#15803d' : '#64748b');
-        ctx.font = num === 100 ? 'bold 12px Inter, sans-serif' : '600 11px Inter, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText(num === 100 ? '👑 100' : (num === 1 ? '▶ 1' : num.toString()), cell.left + 4, cell.top + 4);
         ctx.restore();
     }
 
@@ -1976,299 +2681,545 @@ function drawSnakeLudoBoard(details) {
         17: 7, 54: 34, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 99: 78
     };
 
-    // ======================== DRAW LADDERS ======================== //
+    // 3. Draw Themed Realistic Ladders
     Object.entries(ladders).forEach(([start, end]) => {
         const p1 = getSnakeLudoCellCenter(parseInt(start));
         const p2 = getSnakeLudoCellCenter(parseInt(end));
-
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist === 0) return;
-
-        const ux = dx / dist;
-        const uy = dy / dist;
-        const px = -uy;
-        const py = ux;
-        const railOffset = 10;
-
-        ctx.save();
-
-        // Ladder Cast Shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 4;
-
-        // Wooden Side Rails
-        ctx.strokeStyle = '#854d0e';
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-
-        // Left rail
-        ctx.beginPath();
-        ctx.moveTo(p1.x + px * railOffset, p1.y + py * railOffset);
-        ctx.lineTo(p2.x + px * railOffset, p2.y + py * railOffset);
-        ctx.stroke();
-
-        // Right rail
-        ctx.beginPath();
-        ctx.moveTo(p1.x - px * railOffset, p1.y - py * railOffset);
-        ctx.lineTo(p2.x - px * railOffset, p2.y - py * railOffset);
-        ctx.stroke();
-
-        ctx.shadowColor = 'transparent';
-
-        // Inner Wood Grain Highlight
-        ctx.strokeStyle = '#fef08a';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(p1.x + px * railOffset - 1, p1.y + py * railOffset - 1);
-        ctx.lineTo(p2.x + px * railOffset - 1, p2.y + py * railOffset - 1);
-        ctx.moveTo(p1.x - px * railOffset + 1, p1.y - py * railOffset + 1);
-        ctx.lineTo(p2.x - px * railOffset + 1, p2.y - py * railOffset + 1);
-        ctx.stroke();
-
-        // Rungs
-        const numRungs = Math.max(3, Math.floor(dist / 22));
-        for (let i = 1; i < numRungs; i++) {
-            const t = i / numRungs;
-            const cx = p1.x + dx * t;
-            const cy = p1.y + dy * t;
-
-            // Rung Bar
-            ctx.strokeStyle = '#a16207';
-            ctx.lineWidth = 3.5;
-            ctx.beginPath();
-            ctx.moveTo(cx + px * railOffset, cy + py * railOffset);
-            ctx.lineTo(cx - px * railOffset, cy - py * railOffset);
-            ctx.stroke();
-
-            // Rung Metallic Studs / Caps
-            ctx.fillStyle = '#fde047';
-            ctx.beginPath();
-            ctx.arc(cx + px * railOffset, cy + py * railOffset, 2, 0, Math.PI * 2);
-            ctx.arc(cx - px * railOffset, cy - py * railOffset, 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        ctx.restore();
+        drawRealisticLadder(ctx, p1, p2, theme.ladder, theme.id);
     });
 
-    // ======================== DRAW SNAKES ======================== //
-    const snakePalette = [
-        { main: '#15803d', dark: '#14532d', belly: '#86efac', spots: '#166534' }, // Emerald
-        { main: '#dc2626', dark: '#991b1b', belly: '#fca5a5', spots: '#7f1d1d' }, // Crimson
-        { main: '#9333ea', dark: '#581c87', belly: '#d8b4fe', spots: '#3b0764' }, // Purple
-        { main: '#ea580c', dark: '#9a3412', belly: '#fdba74', spots: '#7c2d12' }, // Orange Cobra
-        { main: '#0284c7', dark: '#075985', belly: '#7dd3fc', spots: '#0c4a6e' }, // Blue Viper
-        { main: '#059669', dark: '#064e3b', belly: '#6ee7b7', spots: '#022c22' }  // Teal
+    // 4. Draw Themed Anatomical Realistic Snakes
+    let snakeIdx = 0;
+    Object.entries(snakes).forEach(([head, tail]) => {
+        const headTile = parseInt(head);
+        const tailTile = parseInt(tail);
+        const species = theme.species[snakeIdx % theme.species.length];
+        snakeIdx++;
+        drawRealisticSnake(ctx, headTile, tailTile, species, theme.id);
+    });
+
+    // 5. Draw Player Tokens
+    if (details && details.players) {
+        drawSnakePlayerTokens(ctx, details);
+    }
+}
+
+// ======================== REALISTIC LADDER RENDERER ======================== //
+
+function drawRealisticLadder(ctx, p1, p2, ladderCfg, themeId) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) return;
+
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const px = -uy;
+    const py = ux;
+    const railOffset = 10;
+
+    ctx.save();
+
+    // 1. Ladder Soft Cast Shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 9;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 4;
+
+    // 2. Ladder Side Rails
+    ctx.strokeStyle = ladderCfg.rail;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+
+    // Left Rail
+    ctx.beginPath();
+    ctx.moveTo(p1.x + px * railOffset, p1.y + py * railOffset);
+    ctx.lineTo(p2.x + px * railOffset, p2.y + py * railOffset);
+    ctx.stroke();
+
+    // Right Rail
+    ctx.beginPath();
+    ctx.moveTo(p1.x - px * railOffset, p1.y - py * railOffset);
+    ctx.lineTo(p2.x - px * railOffset, p2.y - py * railOffset);
+    ctx.stroke();
+
+    ctx.shadowColor = 'transparent';
+
+    // 3. Rail Highlights / Metallic Trim
+    ctx.strokeStyle = ladderCfg.railHighlight;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p1.x + px * railOffset - 1, p1.y + py * railOffset - 1);
+    ctx.lineTo(p2.x + px * railOffset - 1, p2.y + py * railOffset - 1);
+    ctx.moveTo(p1.x - px * railOffset + 1, p1.y - py * railOffset + 1);
+    ctx.lineTo(p2.x - px * railOffset + 1, p2.y - py * railOffset + 1);
+    ctx.stroke();
+
+    // Bamboo Joint Nodules for Jungle Theme
+    if (themeId === 'jungle') {
+        const joints = Math.floor(dist / 32);
+        ctx.fillStyle = '#65a30d';
+        for (let j = 1; j <= joints; j++) {
+            const jt = j / (joints + 1);
+            const jx = p1.x + dx * jt;
+            const jy = p1.y + dy * jt;
+            ctx.beginPath();
+            ctx.arc(jx + px * railOffset, jy + py * railOffset, 4, 0, Math.PI * 2);
+            ctx.arc(jx - px * railOffset, jy - py * railOffset, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // 4. Ladder Rungs
+    const numRungs = Math.max(3, Math.floor(dist / 22));
+    for (let i = 1; i < numRungs; i++) {
+        const t = i / numRungs;
+        const cx = p1.x + dx * t;
+        const cy = p1.y + dy * t;
+
+        // Rung Bar with 3D gradient
+        ctx.strokeStyle = ladderCfg.rung;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(cx + px * railOffset, cy + py * railOffset);
+        ctx.lineTo(cx - px * railOffset, cy - py * railOffset);
+        ctx.stroke();
+
+        // Rung Metallic Stud Caps
+        ctx.fillStyle = ladderCfg.rungCap;
+        ctx.beginPath();
+        ctx.arc(cx + px * railOffset, cy + py * railOffset, 2.2, 0, Math.PI * 2);
+        ctx.arc(cx - px * railOffset, cy - py * railOffset, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+// ======================== REALISTIC ANATOMICAL SNAKE RENDERER ======================== //
+
+function drawRealisticSnake(ctx, headTile, tailTile, species, themeId) {
+    const { pHead, cp1, cp2, pTail } = getSnakeControlPoints(headTile, tailTile);
+
+    const steps = 75;
+    const curvePoints = [];
+    const tangents = [];
+    const normals = [];
+    const widths = [];
+
+    // 1. Sample Bezier Curve with Tangents, Normals & Tapered Body Thickness
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const pt = getSnakeBezierPoint(t, pHead, cp1, cp2, pTail);
+        curvePoints.push(pt);
+
+        // Derivative for tangent vector
+        const u = 1 - t;
+        const dxdt = 3 * u * u * (cp1.x - pHead.x) + 6 * u * t * (cp2.x - cp1.x) + 3 * t * t * (pTail.x - cp2.x);
+        const dydt = 3 * u * u * (cp1.y - pHead.y) + 6 * u * t * (cp2.y - cp1.y) + 3 * t * t * (pTail.y - cp2.y);
+        const tanLen = Math.hypot(dxdt, dydt) || 1;
+        const tx = dxdt / tanLen;
+        const ty = dydt / tanLen;
+        tangents.push({ x: tx, y: ty, angle: Math.atan2(ty, tx) });
+        normals.push({ x: -ty, y: tx });
+
+        // Tapered anatomical body thickness: neck (13px) -> upper body (16.5px) -> mid body (14px) -> tail tip (3px)
+        let w;
+        if (t < 0.08) {
+            w = 13 + (t / 0.08) * 3.5;
+        } else if (t <= 0.45) {
+            w = 16.5 - ((t - 0.08) / 0.37) * 2.5;
+        } else if (t <= 0.80) {
+            w = 14.0 - ((t - 0.45) / 0.35) * 5.0;
+        } else {
+            w = 9.0 - ((t - 0.80) / 0.20) * 6.0;
+        }
+        widths.push(Math.max(2.8, w));
+    }
+
+    ctx.save();
+
+    // 2. Soft Realistic Ground Drop Shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.48)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 3.5;
+    ctx.shadowOffsetY = 4.5;
+    ctx.fillStyle = species.dorsalDark;
+
+    ctx.beginPath();
+    // Top boundary
+    for (let i = 0; i <= steps; i++) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const halfW = widths[i] / 2;
+        if (i === 0) ctx.moveTo(pt.x + n.x * halfW, pt.y + n.y * halfW);
+        else ctx.lineTo(pt.x + n.x * halfW, pt.y + n.y * halfW);
+    }
+    // Bottom boundary
+    for (let i = steps; i >= 0; i--) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const halfW = widths[i] / 2;
+        ctx.lineTo(pt.x - n.x * halfW, pt.y - n.y * halfW);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // 3. 3D Cylindrical Shaded Body Ribbon
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const halfW = widths[i] / 2;
+        if (i === 0) ctx.moveTo(pt.x + n.x * halfW, pt.y + n.y * halfW);
+        else ctx.lineTo(pt.x + n.x * halfW, pt.y + n.y * halfW);
+    }
+    for (let i = steps; i >= 0; i--) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const halfW = widths[i] / 2;
+        ctx.lineTo(pt.x - n.x * halfW, pt.y - n.y * halfW);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = species.dorsalDark;
+    ctx.fill();
+
+    // Body Main Scale Color Stroke
+    ctx.strokeStyle = species.dorsalMain;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 4. Ventral Belly Plates (Transverse Scutes along inner curve)
+    for (let i = 1; i < steps; i += 2) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const w = widths[i];
+        const bellyW = w * 0.42;
+
+        ctx.strokeStyle = species.belly;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(pt.x - n.x * (w / 2), pt.y - n.y * (w / 2));
+        ctx.lineTo(pt.x - n.x * (w / 2 - bellyW), pt.y - n.y * (w / 2 - bellyW));
+        ctx.stroke();
+    }
+
+    // 5. Dorsal Spine 3D Cylindrical Highlight Ridge
+    ctx.strokeStyle = species.dorsalLight;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+        const pt = curvePoints[i];
+        const n = normals[i];
+        const offset = widths[i] * 0.15;
+        if (i === 0) ctx.moveTo(pt.x + n.x * offset, pt.y + n.y * offset);
+        else ctx.lineTo(pt.x + n.x * offset, pt.y + n.y * offset);
+    }
+    ctx.stroke();
+
+    // 6. Species-Specific Dorsal Scale Markings / Saddles
+    const numMarkings = Math.max(5, Math.floor(steps / 5.5));
+    for (let m = 1; m < numMarkings; m++) {
+        const idx = Math.floor((m / numMarkings) * (steps - 8)) + 3;
+        const pt = curvePoints[idx];
+        const n = normals[idx];
+        const t = tangents[idx];
+        const r = widths[idx] * 0.38;
+
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(t.angle);
+
+        if (species.pattern === 'diamond') {
+            // Eastern Diamondback / Viper Diamond Saddles
+            ctx.fillStyle = species.spotBorder;
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 1.3);
+            ctx.lineTo(r * 1.3, 0);
+            ctx.lineTo(0, r * 1.3);
+            ctx.lineTo(-r * 1.3, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = species.spots;
+            ctx.beginPath();
+            ctx.moveTo(0, -r * 0.9);
+            ctx.lineTo(r * 0.9, 0);
+            ctx.lineTo(0, r * 0.9);
+            ctx.lineTo(-r * 0.9, 0);
+            ctx.closePath();
+            ctx.fill();
+        } else if (species.pattern === 'lightning') {
+            // Emerald Tree Boa Lightning Zigzags
+            ctx.fillStyle = species.spotBorder;
+            ctx.beginPath();
+            ctx.moveTo(-r * 1.2, -r * 0.8);
+            ctx.lineTo(0, -r * 1.4);
+            ctx.lineTo(r * 1.2, -r * 0.8);
+            ctx.lineTo(0, r * 0.3);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = species.spots;
+            ctx.beginPath();
+            ctx.arc(0, -r * 0.3, r * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (species.pattern === 'bands') {
+            // Coral Snake Alternating Tri-Color Rings
+            ctx.fillStyle = species.spotBorder;
+            ctx.fillRect(-r * 0.8, -r * 1.2, r * 1.6, r * 2.4);
+            ctx.fillStyle = species.spots;
+            ctx.fillRect(-r * 0.4, -r * 1.2, r * 0.8, r * 2.4);
+        } else if (species.pattern === 'rosette') {
+            // Python Chocolate Rosettes
+            ctx.fillStyle = species.spotBorder;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 1.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = species.spots;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = species.dorsalLight;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Chevron / Viper Spots
+            ctx.fillStyle = species.spotBorder;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, r * 1.2, r * 0.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = species.spots;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, r * 0.8, r * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // 7. Rattle or Tapered Tail Tip
+    const tailPt = curvePoints[steps];
+    const tailTan = tangents[steps];
+    ctx.save();
+    ctx.translate(tailPt.x, tailPt.y);
+    ctx.rotate(tailTan.angle);
+
+    if (species.pattern === 'diamond') {
+        // Rattlesnake Segmented Rattle Rings
+        const rattleColors = ['#d7ccc8', '#bcaaa4', '#8d6e63'];
+        for (let r = 0; r < 3; r++) {
+            ctx.fillStyle = rattleColors[r % rattleColors.length];
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.ellipse(r * 3.5, 0, 2.5, 3.5 - r * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+    } else {
+        // Smooth Slender Coiled Tip
+        ctx.fillStyle = species.dorsalDark;
+        ctx.beginPath();
+        ctx.arc(0, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // 8. Anatomical Realistic Viper / Cobra Head
+    const headPt = curvePoints[0];
+    const headTan = tangents[0];
+    const headAngle = headTan.angle + Math.PI; // Face outwards toward tile
+
+    ctx.save();
+    ctx.translate(headPt.x, headPt.y);
+    ctx.rotate(headAngle);
+
+    // Forked Tongue (Dynamic Flickering Curves)
+    ctx.strokeStyle = species.tongue;
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(11, 0);
+    ctx.lineTo(20, 0);
+    ctx.lineTo(25, -4);
+    ctx.moveTo(20, 0);
+    ctx.lineTo(25, 4);
+    ctx.stroke();
+
+    // Triangular Viper Head / Cobra Hood
+    ctx.fillStyle = species.dorsalMain;
+    ctx.strokeStyle = species.dorsalDark;
+    ctx.lineWidth = 1.8;
+
+    ctx.beginPath();
+    ctx.moveTo(12, 0);          // Snout tip
+    ctx.lineTo(4, -8);          // Upper jaw
+    ctx.lineTo(-8, -10);        // Left temporal venom gland
+    ctx.lineTo(-12, -4);        // Neck left
+    ctx.lineTo(-12, 4);         // Neck right
+    ctx.lineTo(-8, 10);         // Right temporal venom gland
+    ctx.lineTo(4, 8);           // Lower jaw
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Head Crown Scale Highlights
+    ctx.fillStyle = species.dorsalLight;
+    ctx.beginPath();
+    ctx.moveTo(6, 0);
+    ctx.lineTo(0, -4);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(0, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Supraocular Brow Ridges (Menacing 3D shadow over eyes)
+    ctx.strokeStyle = species.dorsalDark;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(3, -5.5, 4, 0, Math.PI);
+    ctx.arc(3, 5.5, 4, 0, Math.PI);
+    ctx.stroke();
+
+    // Eyes: Glowing Reptilian Iris with Vertical Slit Black Pupil
+    ctx.fillStyle = species.eyeColor;
+    ctx.beginPath();
+    ctx.arc(3, -5.5, 3.2, 0, Math.PI * 2);
+    ctx.arc(3, 5.5, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Vertical Slit Black Pupil
+    ctx.fillStyle = '#09090b';
+    ctx.beginPath();
+    ctx.ellipse(3, -5.5, 1.1, 2.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(3, 5.5, 1.1, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Corneal Specular Glint Dot
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(4, -6.5, 0.9, 0, Math.PI * 2);
+    ctx.arc(4, 4.5, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Loreal Heat-Sensing Pits & Nostrils
+    ctx.fillStyle = species.dorsalDark;
+    ctx.beginPath();
+    ctx.arc(8, -2.5, 1, 0, Math.PI * 2);
+    ctx.arc(8, 2.5, 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    ctx.restore();
+}
+
+// ======================== PLAYER TOKENS RENDERER ======================== //
+
+function drawSnakePlayerTokens(ctx, details) {
+    const players = Object.values(details.players);
+    const restingByCell = {};
+
+    players.forEach(p => {
+        const anim = snakeTokenPositions[p.playerId];
+        const pos = anim ? anim.currentPos : p.position;
+        if (!restingByCell[pos]) restingByCell[pos] = [];
+        restingByCell[pos].push(p);
+    });
+
+    const cellOffsets = [
+        { x: 0, y: 0 },
+        { x: -13, y: 13 },
+        { x: 13, y: -13 },
+        { x: 13, y: 13 }
     ];
 
-    let colorIdx = 0;
-    Object.entries(snakes).forEach(([head, tail]) => {
-        const pHead = getSnakeLudoCellCenter(parseInt(head));
-        const pTail = getSnakeLudoCellCenter(parseInt(tail));
-        const theme = snakePalette[colorIdx++ % snakePalette.length];
+    players.forEach(p => {
+        const anim = snakeTokenPositions[p.playerId];
+        let px, py;
+        if (anim) {
+            px = anim.x;
+            py = anim.y;
+            if (!isSnakeAnimating && restingByCell[anim.currentPos] && restingByCell[anim.currentPos].length > 1) {
+                const idx = restingByCell[anim.currentPos].indexOf(p);
+                const off = cellOffsets[idx] || { x: 0, y: 0 };
+                px += off.x;
+                py += off.y;
+            }
+        } else {
+            const pt = getSnakeLudoPosition(p.position);
+            px = pt.x;
+            py = pt.y;
+            if (restingByCell[p.position] && restingByCell[p.position].length > 1) {
+                const idx = restingByCell[p.position].indexOf(p);
+                const off = cellOffsets[idx] || { x: 0, y: 0 };
+                px += off.x;
+                py += off.y;
+            }
+        }
 
-        const dx = pTail.x - pHead.x;
-        const dy = pTail.y - pHead.y;
-        const dist = Math.hypot(dx, dy);
-        
-        // Multi-curved Sinuous Body Control Points
-        const midX1 = pHead.x + dx * 0.35 + (pHead.x > pTail.x ? 32 : -32);
-        const midY1 = pHead.y + dy * 0.35 + 16;
-        const midX2 = pHead.x + dx * 0.70 + (pHead.x > pTail.x ? -24 : 24);
-        const midY2 = pHead.y + dy * 0.70 + 8;
+        const isMe = state.player && p.playerId === state.player.id;
+        const isCurrentTurn = details.currentPlayerId === p.playerId;
 
         ctx.save();
 
-        // 1. Snake Cast Shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 4;
+        // 1. Token Soft Drop Shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 2.5;
+        ctx.shadowOffsetY = 3.5;
 
-        // 2. Snake Outer Body Stroke
-        ctx.strokeStyle = theme.dark;
-        ctx.lineWidth = 14;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        // 2. Token Glossy 3D Dome
+        const radGrad = ctx.createRadialGradient(px - 4, py - 4, 2, px, py, 14);
+        radGrad.addColorStop(0, '#ffffff');
+        radGrad.addColorStop(0.35, p.color || '#ef4444');
+        radGrad.addColorStop(1, '#090d16');
+
+        ctx.fillStyle = radGrad;
         ctx.beginPath();
-        ctx.moveTo(pHead.x, pHead.y);
-        ctx.bezierCurveTo(midX1, midY1, midX2, midY2, pTail.x, pTail.y);
-        ctx.stroke();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.shadowColor = 'transparent';
 
-        // 3. Snake Main Vibrant Color
-        ctx.strokeStyle = theme.main;
-        ctx.lineWidth = 10;
+        // 3. Metallic White Rim
+        ctx.strokeStyle = isMe ? '#fde047' : '#ffffff';
+        ctx.lineWidth = isMe ? 3 : 2.2;
         ctx.stroke();
 
-        // 4. Snake Belly Ridge
-        ctx.strokeStyle = theme.belly;
-        ctx.lineWidth = 3.5;
-        ctx.stroke();
-
-        // 5. Snake Patterned Diamond Spots along body
-        const steps = Math.max(4, Math.floor(dist / 26));
-        for (let i = 1; i < steps; i++) {
-            const t = i / steps;
-            // Cubic bezier formula
-            const bx = Math.pow(1 - t, 3) * pHead.x + 3 * Math.pow(1 - t, 2) * t * midX1 + 3 * (1 - t) * Math.pow(t, 2) * midX2 + Math.pow(t, 3) * pTail.x;
-            const by = Math.pow(1 - t, 3) * pHead.y + 3 * Math.pow(1 - t, 2) * t * midY1 + 3 * (1 - t) * Math.pow(t, 2) * midY2 + Math.pow(t, 3) * pTail.y;
-
-            ctx.fillStyle = theme.spots;
+        // 4. Active Turn Pulsing Golden Aura
+        if (isCurrentTurn) {
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 3.2;
+            ctx.setLineDash([5, 3]);
             ctx.beginPath();
-            ctx.arc(bx, by, 3, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(px, py, 19, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
 
-        // 6. Snake Tapered Tail Tip
-        ctx.fillStyle = theme.dark;
-        ctx.beginPath();
-        ctx.arc(pTail.x, pTail.y, 4, 0, Math.PI * 2);
-        ctx.fill();
+        // 5. Local Player Identification Indicator
+        if (isMe) {
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 9px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('👑 YOU', px, py - 18);
+        }
 
-        // 7. Snake Head & Hood
-        const angle = Math.atan2(midY1 - pHead.y, midX1 - pHead.x) + Math.PI; // Face outwards
-        
-        ctx.save();
-        ctx.translate(pHead.x, pHead.y);
-        ctx.rotate(angle);
+        // 6. Player Initials
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const initial = (p.username || p.playerId || 'P').substring(0, 2).toUpperCase();
+        ctx.fillText(initial, px, py);
 
-        // Forked Tongue
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(10, 0);
-        ctx.lineTo(18, 0);
-        ctx.lineTo(22, -3);
-        ctx.moveTo(18, 0);
-        ctx.lineTo(22, 3);
-        ctx.stroke();
-
-        // Head Shape
-        ctx.fillStyle = theme.main;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 11, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = theme.dark;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Eyes (Shining Yellow with Black Slits)
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.arc(3, -5, 3.2, 0, Math.PI * 2);
-        ctx.arc(3, 5, 3.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.ellipse(3, -5, 1.2, 2.5, 0, 0, Math.PI * 2);
-        ctx.ellipse(3, 5, 1.2, 2.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Nostril dots
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.arc(8, -2, 0.8, 0, Math.PI * 2);
-        ctx.arc(8, 2, 0.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
         ctx.restore();
     });
-
-    // ======================== DRAW PLAYER TOKENS ======================== //
-    if (details && details.players) {
-        const players = Object.values(details.players);
-        const restingByCell = {};
-
-        players.forEach(p => {
-            const anim = snakeTokenPositions[p.playerId];
-            const pos = anim ? anim.currentPos : p.position;
-            if (!restingByCell[pos]) restingByCell[pos] = [];
-            restingByCell[pos].push(p);
-        });
-
-        const cellOffsets = [
-            { x: 0, y: 0 },
-            { x: -12, y: 12 },
-            { x: 12, y: -12 },
-            { x: 12, y: 12 }
-        ];
-
-        players.forEach(p => {
-            const anim = snakeTokenPositions[p.playerId];
-            let px, py;
-            if (anim) {
-                px = anim.x;
-                py = anim.y;
-                if (!isSnakeAnimating && restingByCell[anim.currentPos] && restingByCell[anim.currentPos].length > 1) {
-                    const idx = restingByCell[anim.currentPos].indexOf(p);
-                    const off = cellOffsets[idx] || { x: 0, y: 0 };
-                    px += off.x;
-                    py += off.y;
-                }
-            } else {
-                const pt = getSnakeLudoPosition(p.position);
-                px = pt.x;
-                py = pt.y;
-                if (restingByCell[p.position] && restingByCell[p.position].length > 1) {
-                    const idx = restingByCell[p.position].indexOf(p);
-                    const off = cellOffsets[idx] || { x: 0, y: 0 };
-                    px += off.x;
-                    py += off.y;
-                }
-            }
-
-            ctx.save();
-
-            // Token outer shadow
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-            ctx.shadowBlur = 7;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 3;
-
-            // Token Sphere Base
-            const radGrad = ctx.createRadialGradient(px - 4, py - 4, 2, px, py, 14);
-            radGrad.addColorStop(0, '#ffffff');
-            radGrad.addColorStop(0.3, p.color || '#ef4444');
-            radGrad.addColorStop(1, '#0f172a');
-
-            ctx.fillStyle = radGrad;
-            ctx.beginPath();
-            ctx.arc(px, py, 14, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.shadowColor = 'transparent';
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-
-            // Active Turn Pulsing Glow
-            if (details.currentPlayerId === p.playerId) {
-                ctx.strokeStyle = '#fbbf24';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(px, py, 18, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-
-            // Player Initials
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const initial = (p.username || p.playerId || 'P').substring(0, 2).toUpperCase();
-            ctx.fillText(initial, px, py);
-
-            ctx.restore();
-        });
-    }
 }
 
 // ======================== LOBBY & UI HELPERS ======================== //
@@ -2286,27 +3237,45 @@ function renderRooms() {
 
     el.noRoomsPlaceholder.style.display = 'none';
     el.roomList.innerHTML = filtered.map(room => {
-        const isFull = room.currentPlayersCount >= room.maxPlayers;
+        const isAlreadyPlayer = state.player && room.playerIds && room.playerIds.includes(state.player.id);
+        const isAlreadySpectator = state.player && room.spectatorIds && room.spectatorIds.includes(state.player.id);
+        const playerCount = (room.currentPlayersCount != null) ? room.currentPlayersCount : (room.playerIds ? room.playerIds.length : 0);
+        const spectatorCount = (room.spectatorCount != null) ? room.spectatorCount : (room.spectatorIds ? room.spectatorIds.length : 0);
+        const isFull = playerCount >= room.maxPlayers;
         const isInProgress = room.status === 'IN_PROGRESS';
-        const canJoin = !isFull && (!isInProgress || room.lateJoinAllowed);
+        const canJoin = !isAlreadyPlayer && !isFull && (!isInProgress || room.lateJoinAllowed);
+
         let joinBtn = '';
-        if (canJoin) {
+        if (isAlreadyPlayer) {
+            joinBtn = `<button class="btn btn-primary" onclick="joinRoom('${room.roomId}', false)">Resume Game</button>`;
+        } else if (canJoin) {
             joinBtn = `<button class="btn btn-primary" onclick="joinRoom('${room.roomId}', false)">Join Game</button>`;
         } else if (isFull) {
             joinBtn = `<button class="btn btn-secondary" disabled>Room Full</button>`;
         } else if (isInProgress) {
             joinBtn = `<button class="btn btn-secondary" disabled>In Progress</button>`;
         }
-        const spectateBtn = room.spectatorAllowed ? `<button class="btn btn-secondary" onclick="joinRoom('${room.roomId}', true)">Spectate</button>` : '';
+
+        let spectateBtn = '';
+        if (room.spectatorAllowed) {
+            if (isAlreadySpectator) {
+                spectateBtn = `<button class="btn btn-secondary" onclick="joinRoom('${room.roomId}', true)">👁️ Watching</button>`;
+            } else {
+                spectateBtn = `<button class="btn btn-secondary" onclick="joinRoom('${room.roomId}', true)">👁️ Spectate</button>`;
+            }
+        }
 
         return `
         <div class="room-card">
             <div class="room-card-header">
-                <span class="room-card-title">${room.name}</span>
+                <span class="room-card-title">${escapeHtml(room.name)}</span>
                 <span class="room-card-badge">${getGameIcon(room.gameType)} ${formatGameType(room.gameType)}</span>
             </div>
             <div class="room-card-body">
-                <div>Players: <strong>${room.currentPlayersCount}/${room.maxPlayers}</strong></div>
+                <div class="room-stats-grid">
+                    <div>👥 Players: <strong>${playerCount}/${room.maxPlayers}</strong></div>
+                    <div>👁️ Spectators: <strong>${spectatorCount}</strong></div>
+                </div>
                 <div>Status: <span class="status-pill ${room.status ? room.status.toLowerCase().replace('_', '-') : ''}">${formatStatus(room.status)}</span></div>
             </div>
             <div class="room-card-footer">
@@ -2316,6 +3285,16 @@ function renderRooms() {
         </div>
         `;
     }).join('');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 window.joinRoom = joinRoom;

@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 @Service
@@ -17,20 +19,42 @@ public class PlayerService {
 
     private static final Logger log = LoggerFactory.getLogger(PlayerService.class);
     private final PlayerRepository playerRepository;
+    private final Random random = new Random();
+
+    public static final List<String> COOL_NAMES = List.of(
+            "ShadowNinja", "CosmicDragon", "ThunderFalcon", "PixelKnight", "MysticWizard",
+            "CyberSamurai", "NeonViper", "BlazePhoenix", "StarHunter", "FrostTiger",
+            "QuantumGhost", "VortexStriker", "TurboRacer", "ApexLegend", "IronGolem",
+            "SolarFlare", "PhantomRogue", "EchoTitan", "HyperFalcon", "NovaKnight",
+            "ShadowHunter", "StormBreaker", "LunarFox", "AstroWolf", "VelocityRider",
+            "DragonSlayer", "CrimsonHawk", "NightCrawler", "ZenithMaster", "AlphaWolf"
+    );
 
     public PlayerService(PlayerRepository playerRepository) {
         this.playerRepository = playerRepository;
     }
 
-    public Player registerPlayer(String username) {
-        String cleanUsername = (username != null && !username.trim().isEmpty())
-                ? username.trim()
-                : "Player-" + UUID.randomUUID().toString().substring(0, 5);
+    public synchronized Player registerPlayer(String username) {
+        String baseName;
+        if (username != null && !username.trim().isEmpty()) {
+            baseName = username.trim();
+        } else {
+            baseName = COOL_NAMES.get(random.nextInt(COOL_NAMES.size()));
+        }
+
+        String finalUsername = baseName;
+        if (playerRepository.existsByUsernameIgnoreCase(finalUsername)) {
+            int index = 1;
+            while (playerRepository.existsByUsernameIgnoreCase(baseName + " " + index)) {
+                index++;
+            }
+            finalUsername = baseName + " " + index;
+        }
 
         String playerId = "p-" + UUID.randomUUID().toString().substring(0, 8);
-        Player player = Player.create(playerId, cleanUsername);
+        Player player = Player.create(playerId, finalUsername);
         playerRepository.save(player);
-        log.info("Registered new player: id={}, username={}", playerId, cleanUsername);
+        log.info("Registered new player: id={}, username={}", playerId, finalUsername);
         return player;
     }
 

@@ -111,6 +111,7 @@ public class RoomService {
         }
 
         room.getPlayerIds().add(host.getId());
+        room.getPlayerUsernames().put(host.getId(), host.getUsername());
         if (room.getPlayerIds().size() >= room.getMinPlayers()) {
             room.setStatus(RoomStatus.READY);
         }
@@ -143,16 +144,22 @@ public class RoomService {
                 if (!room.isSpectatorAllowed()) {
                     throw new GamePlatformException(ErrorCodes.INVALID_ACTION, "Spectating is not allowed in this room");
                 }
-                if (!room.containsSpectator(playerId)) {
+                if (!room.containsSpectator(playerId) && !room.containsPlayer(playerId)) {
                     room.getSpectatorIds().add(playerId);
+                    room.getSpectatorUsernames().put(playerId, player.getUsername());
                 }
             } else {
                 if (room.containsPlayer(playerId)) {
                     // Already in room - reconnecting or rejoining
+                    room.getPlayerUsernames().put(playerId, player.getUsername());
                     sessionManager.subscribeRoom(roomId, playerId);
                     notifyPlayerReconnected(room, player);
                     return room;
                 }
+
+                // If moving from spectator to active player, remove from spectatorIds
+                room.getSpectatorIds().remove(playerId);
+                room.getSpectatorUsernames().remove(playerId);
 
                 if (room.getStatus() == RoomStatus.IN_PROGRESS && !room.isLateJoinAllowed()) {
                     throw new GamePlatformException(ErrorCodes.GAME_ALREADY_STARTED, "Game in progress. Late join not allowed");
@@ -167,6 +174,7 @@ public class RoomService {
                 }
 
                 room.getPlayerIds().add(playerId);
+                room.getPlayerUsernames().put(playerId, player.getUsername());
                 if (room.getStatus() == RoomStatus.WAITING || room.getStatus() == RoomStatus.FINISHED || room.getStatus() == RoomStatus.READY) {
                     if ("LUDO".equalsIgnoreCase(room.getGameType())) {
                         if (room.getPlayerIds().size() == 2 || room.getPlayerIds().size() == 4) {
@@ -219,6 +227,12 @@ public class RoomService {
             boolean isCreator = playerId.equals(room.getHostPlayerId());
             boolean removedPlayer = room.getPlayerIds().remove(playerId);
             boolean removedSpectator = room.getSpectatorIds().remove(playerId);
+            if (removedPlayer) {
+                room.getPlayerUsernames().remove(playerId);
+            }
+            if (removedSpectator) {
+                room.getSpectatorUsernames().remove(playerId);
+            }
             sessionManager.unsubscribeRoom(roomId, playerId);
 
             if (!removedPlayer && !removedSpectator) {
@@ -517,18 +531,20 @@ public class RoomService {
                 room.getRoomLock().unlock();
             }
 
-            // Schedule disconnect timeout to handle forfeit if player does not reconnect
-            ScheduledFuture<?> existing = disconnectTasks.remove(playerId);
-            if (existing != null) {
-                existing.cancel(false);
+            // Schedule disconnect timeout to handle forfeit if an active player does not reconnect
+            if (room.containsPlayer(playerId)) {
+                ScheduledFuture<?> existing = disconnectTasks.remove(playerId);
+                if (existing != null) {
+                    existing.cancel(false);
+                }
+
+                ScheduledFuture<?> task = disconnectScheduler.schedule(() -> {
+                    disconnectTasks.remove(playerId);
+                    executeDisconnectForfeit(room.getRoomId(), playerId);
+                }, disconnectTimeoutSeconds, TimeUnit.SECONDS);
+
+                disconnectTasks.put(playerId, task);
             }
-
-            ScheduledFuture<?> task = disconnectScheduler.schedule(() -> {
-                disconnectTasks.remove(playerId);
-                executeDisconnectForfeit(room.getRoomId(), playerId);
-            }, disconnectTimeoutSeconds, TimeUnit.SECONDS);
-
-            disconnectTasks.put(playerId, task);
         });
     }
 

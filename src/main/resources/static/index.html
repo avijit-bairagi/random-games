@@ -67,7 +67,7 @@
                         <label for="usernameInput">Choose Your Player Name</label>
                         <div class="input-with-icon">
                             <span class="input-icon">👤</span>
-                            <input type="text" id="usernameInput" placeholder="Enter name (e.g. Neo, Maverick, Shadow)" maxlength="20" autofocus autocomplete="off">
+                            <input type="text" id="usernameInput" placeholder="Enter name (or leave empty for a cool name)" maxlength="20" autofocus autocomplete="off">
                         </div>
                     </div>
                     <button id="enterPlatformBtn" class="btn btn-primary btn-large btn-glow">Enter Gaming Arena 🚀</button>
@@ -114,6 +114,7 @@
                         <h2 id="roomTitle">Room Name</h2>
                         <span class="game-tag" id="roomGameType">TIC_TAC_TOE</span>
                         <span class="status-pill" id="roomStatusPill">Waiting</span>
+                        <span class="spectator-mode-badge" id="roomSpectatorBadge" style="display: none;">👁️ Spectator Mode</span>
                     </div>
                     <div class="room-controls" id="hostControls">
                         <button id="startGameBtn" class="btn btn-success btn-large" style="display: none;">▶ Start Game</button>
@@ -127,6 +128,13 @@
                         <div class="sidebar-card">
                             <h3>Players (<span id="playerCount">1</span>/<span id="maxPlayerCount">2</span>)</h3>
                             <ul id="playersList" class="players-list">
+                                <!-- Populated dynamically -->
+                            </ul>
+                        </div>
+
+                        <div class="sidebar-card" id="spectatorsCard">
+                            <h3>Spectators (<span id="spectatorCount">0</span>)</h3>
+                            <ul id="spectatorsList" class="players-list">
                                 <!-- Populated dynamically -->
                             </ul>
                         </div>
@@ -198,6 +206,16 @@
 
                         <!-- Snake and Ladder Board Canvas -->
                         <div id="snakeBoardContainer" class="board-container" style="display: none;">
+                            <div class="board-theme-bar">
+                                <span class="theme-label">🎨 Board Template:</span>
+                                <div class="theme-pills" id="snakeThemeSelector">
+                                    <button class="theme-pill active" data-theme="classic" type="button">📜 Classic Royal</button>
+                                    <button class="theme-pill" data-theme="jungle" type="button">🌿 Jungle Safari</button>
+                                    <button class="theme-pill" data-theme="neon" type="button">⚡ Neon Cyber</button>
+                                    <button class="theme-pill" data-theme="desert" type="button">🏜️ Desert Oasis</button>
+                                    <button class="theme-pill" data-theme="frost" type="button">❄️ Arctic Frost</button>
+                                </div>
+                            </div>
                             <div class="ludo-turn-box">
                                 <div class="turn-indicator" id="snakeTurnIndicator">⏳ Waiting for game to start...</div>
                                 <div class="dice-roll-container">
@@ -209,7 +227,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="canvas-wrapper snake-canvas-wrapper">
+                            <div class="canvas-wrapper snake-canvas-wrapper" id="snakeCanvasWrapper">
                                 <canvas id="snakeCanvas" width="600" height="600"></canvas>
                                 <div id="snakeCenterDiceOverlay" class="center-dice-overlay" style="display: none;">
                                     <div class="center-dice-box">
@@ -269,6 +287,34 @@
                 <div class="modal-footer">
                     <button class="btn btn-secondary" id="cancelCreateRoomBtn">Cancel</button>
                     <button class="btn btn-primary btn-glow" id="confirmCreateRoomBtn">✨ Create Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over / Victory / Draw Modal -->
+        <div id="gameOverModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-card game-over-modal-card">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-icon" id="gameOverIcon">🏆</span>
+                        <h3 id="gameOverTitle">Match Finished!</h3>
+                    </div>
+                    <span class="modal-close" id="closeGameOverModalBtn">&times;</span>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="game-over-banner" id="gameOverBanner">
+                        <div class="game-over-trophy" id="gameOverTrophy">👑</div>
+                        <h2 class="game-over-winner" id="gameOverWinner">Alice Wins!</h2>
+                        <p class="game-over-subtitle" id="gameOverSubtitle">Congratulations on an epic victory!</p>
+                    </div>
+                    <div class="game-over-details" id="gameOverDetails">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                <div class="modal-footer game-over-footer">
+                    <button class="btn btn-secondary" id="gameOverLobbyBtn">🚪 Return to Lobby</button>
+                    <button class="btn btn-warning" id="gameOverRestartBtn" style="display: none;">🔄 Restart Game</button>
+                    <button class="btn btn-primary" id="gameOverCloseBtn">Stay in Room</button>
                 </div>
             </div>
         </div>

@@ -206,7 +206,7 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
         int targetPos = oldPos + diceRoll;
         List<GameEvent> events = new ArrayList<>();
         GameStatus newStatus = GameStatus.IN_PROGRESS;
-        String winner = null;
+        String winner = snakeState.getWinner();
         String actionMessage;
 
         events.add(GameEvent.builder()
@@ -218,6 +218,7 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
                 .build());
 
         boolean reachedGoal = false;
+        int finisherRank = 0;
 
         if (targetPos > 100) {
             // Cannot move beyond 100
@@ -231,19 +232,49 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
                     .build());
         } else if (targetPos == 100) {
             // Reached goal!
-            currentPlayerState.setPosition(100);
-            currentPlayerState.setRank(1);
             reachedGoal = true;
-            newStatus = GameStatus.FINISHED;
-            winner = player.getId();
-            actionMessage = "🎉 " + player.getUsername() + " rolled a " + diceRoll + ", reached 100 and won the match!";
-            events.add(GameEvent.builder()
-                    .eventType("PLAYER_WON")
-                    .gameId(snakeState.getGameId())
-                    .playerId(player.getId())
-                    .payload(Map.of("winner", player.getUsername(), "position", 100))
-                    .timestamp(System.currentTimeMillis())
-                    .build());
+            finisherRank = (int) updatedPlayers.values().stream().filter(p -> p.getRank() > 0).count() + 1;
+            currentPlayerState.setPosition(100);
+            currentPlayerState.setRank(finisherRank);
+
+            if (finisherRank == 1 && winner == null) {
+                winner = player.getId();
+            }
+
+            long stillPlayingCount = updatedPlayers.values().stream()
+                    .filter(p -> p.isActive() && p.getPosition() < 100)
+                    .count();
+
+            if (stillPlayingCount <= 1) {
+                // Game completely finished!
+                newStatus = GameStatus.FINISHED;
+                // Assign rank to the last remaining active player if any
+                final int lastRank = finisherRank + 1;
+                updatedPlayers.values().stream()
+                        .filter(p -> p.isActive() && p.getPosition() < 100)
+                        .findFirst()
+                        .ifPresent(rp -> rp.setRank(lastRank));
+
+                actionMessage = "🎉 " + player.getUsername() + " rolled a " + diceRoll + ", reached 100 (Rank #" + finisherRank + ")! Match finished!";
+                events.add(GameEvent.builder()
+                        .eventType("PLAYER_WON")
+                        .gameId(snakeState.getGameId())
+                        .playerId(player.getId())
+                        .payload(Map.of("winner", player.getUsername(), "rank", finisherRank, "position", 100))
+                        .timestamp(System.currentTimeMillis())
+                        .build());
+            } else {
+                // More than 1 player still on the board -> match continues while this player spectates!
+                newStatus = GameStatus.IN_PROGRESS;
+                actionMessage = "🎉 " + player.getUsername() + " rolled a " + diceRoll + ", reached 100 (Rank #" + finisherRank + ") and is now spectating! " + stillPlayingCount + " players remaining.";
+                events.add(GameEvent.builder()
+                        .eventType("PLAYER_FINISHED")
+                        .gameId(snakeState.getGameId())
+                        .playerId(player.getId())
+                        .payload(Map.of("player", player.getUsername(), "rank", finisherRank, "position", 100, "remaining", stillPlayingCount))
+                        .timestamp(System.currentTimeMillis())
+                        .build());
+            }
         } else {
             // Check ladder or snake
             if (details.getLadders().containsKey(targetPos)) {
@@ -286,13 +317,17 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
         int consecutiveSixes = details.getConsecutiveSixes();
 
         if (reachedGoal) {
-            // Game over
-            nextPlayerId = null;
+            consecutiveSixes = 0;
+            if (newStatus == GameStatus.FINISHED) {
+                nextPlayerId = null;
+            } else {
+                nextPlayerId = getNextPlayingPlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
+            }
         } else if (diceRoll == 6) {
             if (consecutiveSixes + 1 >= 3) {
                 // 3 sixes in a row -> turn passes
                 consecutiveSixes = 0;
-                nextPlayerId = getNextActivePlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
+                nextPlayerId = getNextPlayingPlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
                 actionMessage += " Three 6s in a row! Turn passes to next player.";
             } else {
                 consecutiveSixes++;
@@ -308,7 +343,7 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
             }
         } else {
             consecutiveSixes = 0;
-            nextPlayerId = getNextActivePlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
+            nextPlayerId = getNextPlayingPlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
         }
 
         String nextColor = null;
@@ -346,19 +381,19 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
                 .build();
     }
 
-    private String getNextActivePlayerId(List<String> turnOrder, String currentId, Map<String, SnakeState.SnakePlayerData> players) {
+    private String getNextPlayingPlayerId(List<String> turnOrder, String currentId, Map<String, SnakeState.SnakePlayerData> players) {
         int currentIndex = turnOrder.indexOf(currentId);
-        if (currentIndex < 0) return turnOrder.get(0);
+        if (currentIndex < 0) currentIndex = 0;
 
         for (int i = 1; i <= turnOrder.size(); i++) {
             int nextIndex = (currentIndex + i) % turnOrder.size();
             String candidateId = turnOrder.get(nextIndex);
             SnakeState.SnakePlayerData candidateData = players.get(candidateId);
-            if (candidateData != null && candidateData.isActive()) {
+            if (candidateData != null && candidateData.isActive() && candidateData.getPosition() < 100) {
                 return candidateId;
             }
         }
-        return currentId;
+        return null;
     }
 
     @Override
@@ -366,6 +401,8 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
         if (!(state instanceof SnakeState snakeState)) return false;
         if (snakeState.getStatus() != GameStatus.IN_PROGRESS) return false;
         if (player == null || !player.getId().equals(snakeState.getDetails().getCurrentPlayerId())) return false;
+        SnakeState.SnakePlayerData pd = snakeState.getDetails().getPlayers().get(player.getId());
+        if (pd != null && pd.getPosition() >= 100) return false;
         return action != null && (action.getActionType() == null || SnakeAction.ROLL_DICE.equalsIgnoreCase(action.getActionType()));
     }
 
@@ -382,21 +419,30 @@ public class SnakeGameEngine implements GameEngine<SnakeState.Details, SnakeActi
             pd.setActive(false);
         }
 
-        long activeCount = updatedPlayers.values().stream().filter(SnakeState.SnakePlayerData::isActive).count();
+        long stillPlayingCount = updatedPlayers.values().stream()
+                .filter(p -> p.isActive() && p.getPosition() < 100)
+                .count();
+
         GameStatus newStatus = snakeState.getStatus();
         String winner = snakeState.getWinner();
         String nextPlayerId = details.getCurrentPlayerId();
 
-        if (activeCount <= 1) {
+        if (stillPlayingCount <= 1) {
             newStatus = GameStatus.FINISHED;
-            winner = updatedPlayers.values().stream()
-                    .filter(SnakeState.SnakePlayerData::isActive)
-                    .map(SnakeState.SnakePlayerData::getPlayerId)
-                    .findFirst()
-                    .orElse(null);
+            if (winner == null) {
+                winner = updatedPlayers.values().stream()
+                        .filter(p -> p.getRank() == 1)
+                        .map(SnakeState.SnakePlayerData::getPlayerId)
+                        .findFirst()
+                        .orElseGet(() -> updatedPlayers.values().stream()
+                                .filter(SnakeState.SnakePlayerData::isActive)
+                                .map(SnakeState.SnakePlayerData::getPlayerId)
+                                .findFirst()
+                                .orElse(null));
+            }
             nextPlayerId = null;
         } else if (player.getId().equals(details.getCurrentPlayerId())) {
-            nextPlayerId = getNextActivePlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
+            nextPlayerId = getNextPlayingPlayerId(details.getTurnOrder(), player.getId(), updatedPlayers);
         }
 
         String nextColor = null;

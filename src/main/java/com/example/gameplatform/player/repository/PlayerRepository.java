@@ -26,6 +26,12 @@ public class PlayerRepository {
         return players.containsKey(playerId);
     }
 
+    public boolean existsByUsernameIgnoreCase(String username) {
+        if (username == null) return false;
+        return players.values().stream()
+                .anyMatch(p -> p.getUsername() != null && p.getUsername().equalsIgnoreCase(username.trim()));
+    }
+
     public void deleteById(String playerId) {
         players.remove(playerId);
     }
