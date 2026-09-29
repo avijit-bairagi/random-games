@@ -26,6 +26,8 @@ public class GameRoom {
 
     private List<String> playerIds = Collections.synchronizedList(new ArrayList<>());
     private List<String> spectatorIds = Collections.synchronizedList(new ArrayList<>());
+    private Map<String, String> playerUsernames = new ConcurrentHashMap<>();
+    private Map<String, String> spectatorUsernames = new ConcurrentHashMap<>();
     private Map<String, Object> configuration = new ConcurrentHashMap<>();
 
     private volatile GameState<?> currentGameState;
@@ -36,6 +38,7 @@ public class GameRoom {
     public GameRoom(String roomId, String name, String gameType, String hostPlayerId, int minPlayers, int maxPlayers,
                     boolean spectatorAllowed, boolean lateJoinAllowed, RoomStatus status, Instant createdAt,
                     Instant startedAt, Instant finishedAt, List<String> playerIds, List<String> spectatorIds,
+                    Map<String, String> playerUsernames, Map<String, String> spectatorUsernames,
                     Map<String, Object> configuration, GameState<?> currentGameState) {
         this.roomId = roomId;
         this.name = name;
@@ -51,6 +54,8 @@ public class GameRoom {
         this.finishedAt = finishedAt;
         if (playerIds != null) this.playerIds = Collections.synchronizedList(new ArrayList<>(playerIds));
         if (spectatorIds != null) this.spectatorIds = Collections.synchronizedList(new ArrayList<>(spectatorIds));
+        if (playerUsernames != null) this.playerUsernames.putAll(playerUsernames);
+        if (spectatorUsernames != null) this.spectatorUsernames.putAll(spectatorUsernames);
         if (configuration != null) this.configuration.putAll(configuration);
         this.currentGameState = currentGameState;
     }
@@ -74,6 +79,8 @@ public class GameRoom {
         private Instant finishedAt;
         private List<String> playerIds = new ArrayList<>();
         private List<String> spectatorIds = new ArrayList<>();
+        private Map<String, String> playerUsernames = new ConcurrentHashMap<>();
+        private Map<String, String> spectatorUsernames = new ConcurrentHashMap<>();
         private Map<String, Object> configuration = new ConcurrentHashMap<>();
         private GameState<?> currentGameState;
 
@@ -91,13 +98,15 @@ public class GameRoom {
         public Builder finishedAt(Instant finishedAt) { this.finishedAt = finishedAt; return this; }
         public Builder playerIds(List<String> playerIds) { this.playerIds = playerIds; return this; }
         public Builder spectatorIds(List<String> spectatorIds) { this.spectatorIds = spectatorIds; return this; }
+        public Builder playerUsernames(Map<String, String> playerUsernames) { this.playerUsernames = playerUsernames; return this; }
+        public Builder spectatorUsernames(Map<String, String> spectatorUsernames) { this.spectatorUsernames = spectatorUsernames; return this; }
         public Builder configuration(Map<String, Object> configuration) { this.configuration = configuration; return this; }
         public Builder currentGameState(GameState<?> currentGameState) { this.currentGameState = currentGameState; return this; }
 
         public GameRoom build() {
             return new GameRoom(roomId, name, gameType, hostPlayerId, minPlayers, maxPlayers,
                     spectatorAllowed, lateJoinAllowed, status, createdAt, startedAt, finishedAt,
-                    playerIds, spectatorIds, configuration, currentGameState);
+                    playerIds, spectatorIds, playerUsernames, spectatorUsernames, configuration, currentGameState);
         }
     }
 
@@ -134,6 +143,10 @@ public class GameRoom {
     public void setPlayerIds(List<String> playerIds) { this.playerIds = playerIds; }
     public List<String> getSpectatorIds() { return spectatorIds; }
     public void setSpectatorIds(List<String> spectatorIds) { this.spectatorIds = spectatorIds; }
+    public Map<String, String> getPlayerUsernames() { return playerUsernames; }
+    public void setPlayerUsernames(Map<String, String> playerUsernames) { this.playerUsernames = playerUsernames; }
+    public Map<String, String> getSpectatorUsernames() { return spectatorUsernames; }
+    public void setSpectatorUsernames(Map<String, String> spectatorUsernames) { this.spectatorUsernames = spectatorUsernames; }
     public Map<String, Object> getConfiguration() { return configuration; }
     public void setConfiguration(Map<String, Object> configuration) { this.configuration = configuration; }
     public GameState<?> getCurrentGameState() { return currentGameState; }

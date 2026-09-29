@@ -277,6 +277,112 @@ class PlatformIntegrationTest {
     }
 
     @Test
+    @DisplayName("shouldHandleSpectatorModeCorrectly")
+    void shouldHandleSpectatorModeCorrectly() {
+        Player host = playerService.registerPlayer("SpecHost");
+        Player guest = playerService.registerPlayer("SpecGuest");
+        Player spectator = playerService.registerPlayer("SpecViewer");
+
+        CreateRoomRequest request = CreateRoomRequest.builder()
+                .name("Spectator Test Room")
+                .gameType("TIC_TAC_TOE")
+                .hostPlayerId(host.getId())
+                .maxPlayers(2)
+                .spectatorAllowed(true)
+                .build();
+
+        GameRoom room = roomService.createRoom(request);
+        roomService.joinRoom(room.getRoomId(), guest.getId(), false);
+        roomService.joinRoom(room.getRoomId(), spectator.getId(), true);
+
+        GameRoom currentRoom = roomService.getRoom(room.getRoomId());
+        assertEquals(2, currentRoom.getPlayerIds().size());
+        assertEquals(1, currentRoom.getSpectatorIds().size());
+        assertTrue(currentRoom.containsSpectator(spectator.getId()));
+        assertFalse(currentRoom.containsPlayer(spectator.getId()));
+
+        RoomResponse response = RoomResponse.from(currentRoom);
+        assertEquals(2, response.getCurrentPlayersCount());
+        assertEquals(1, response.getSpectatorCount());
+
+        // Start game with 2 active players
+        GameState<?> started = roomService.startGame(room.getRoomId(), host.getId());
+        assertNotNull(started);
+        assertEquals(2, started.getPlayers().size());
+
+        // Spectator attempting game action is rejected
+        GamePlatformException ex = assertThrows(GamePlatformException.class,
+                () -> roomService.processGameAction(room.getRoomId(), spectator.getId(), "req-spec", Map.of(
+                        "action", "PLACE_MARK",
+                        "row", 0,
+                        "column", 0
+                )));
+        assertEquals("PLAYER_NOT_IN_GAME", ex.getCode());
+
+        // Spectator leaves room -> match remains IN_PROGRESS and player count unaffected
+        roomService.leaveRoom(room.getRoomId(), spectator.getId());
+        GameRoom afterLeave = roomService.getRoom(room.getRoomId());
+        assertEquals(0, afterLeave.getSpectatorIds().size());
+        assertEquals(2, afterLeave.getPlayerIds().size());
+        assertEquals(RoomStatus.IN_PROGRESS, afterLeave.getStatus());
+    }
+
+    @Test
+    @DisplayName("shouldGenerateCoolNameWhenUsernameNotProvidedAndDeduplicateDuplicates")
+    void shouldGenerateCoolNameWhenUsernameNotProvidedAndDeduplicateDuplicates() {
+        // Register player without username -> gets a cool gamer name
+        Player p1 = playerService.registerPlayer(null);
+        assertNotNull(p1.getUsername());
+        assertFalse(p1.getUsername().trim().isEmpty());
+        assertTrue(PlayerService.COOL_NAMES.contains(p1.getUsername()) || p1.getUsername().matches(".+\\s\\d+"));
+
+        Player p2 = playerService.registerPlayer("   ");
+        assertNotNull(p2.getUsername());
+        assertFalse(p2.getUsername().trim().isEmpty());
+
+        // Duplicate username -> appends 1, 2, ...
+        Player custom1 = playerService.registerPlayer("ApexHero");
+        assertEquals("ApexHero", custom1.getUsername());
+
+        Player custom2 = playerService.registerPlayer("ApexHero");
+        assertEquals("ApexHero 1", custom2.getUsername());
+
+        Player custom3 = playerService.registerPlayer("ApexHero");
+        assertEquals("ApexHero 2", custom3.getUsername());
+    }
+
+    @Test
+    @DisplayName("shouldIncludePlayerAndSpectatorNamesInRoomResponse")
+    void shouldIncludePlayerAndSpectatorNamesInRoomResponse() {
+        Player host = playerService.registerPlayer("AlphaHost");
+        Player player = playerService.registerPlayer("BetaPlayer");
+        Player spectator = playerService.registerPlayer("GammaViewer");
+
+        CreateRoomRequest request = CreateRoomRequest.builder()
+                .name("Naming Test Room")
+                .gameType("TIC_TAC_TOE")
+                .hostPlayerId(host.getId())
+                .maxPlayers(2)
+                .spectatorAllowed(true)
+                .build();
+
+        GameRoom room = roomService.createRoom(request);
+        roomService.joinRoom(room.getRoomId(), player.getId(), false);
+        roomService.joinRoom(room.getRoomId(), spectator.getId(), true);
+
+        GameRoom currentRoom = roomService.getRoom(room.getRoomId());
+        RoomResponse response = RoomResponse.from(currentRoom);
+
+        assertEquals("AlphaHost", response.getHostUsername());
+        assertNotNull(response.getPlayerNames());
+        assertEquals("AlphaHost", response.getPlayerNames().get(host.getId()));
+        assertEquals("BetaPlayer", response.getPlayerNames().get(player.getId()));
+
+        assertNotNull(response.getSpectatorNames());
+        assertEquals("GammaViewer", response.getSpectatorNames().get(spectator.getId()));
+    }
+
+    @Test
     @DisplayName("shouldServeFaviconStaticResource")
     void shouldServeFaviconStaticResource() {
         ResponseEntity<byte[]> response = restTemplate.getForEntity("/favicon.ico", byte[].class);

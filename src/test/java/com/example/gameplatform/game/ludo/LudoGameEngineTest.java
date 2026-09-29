@@ -189,6 +189,38 @@ class LudoGameEngineTest {
     }
 
     @Test
+    @DisplayName("shouldGrantBonusTurnWhenSinglePieceReachesHomeWithoutWinning")
+    void shouldGrantBonusTurnWhenSinglePieceReachesHomeWithoutWinning() {
+        GameState<LudoState.Details> state = engine.createGame("ludo-1", List.of(player1, player2), engine.defaultConfiguration());
+        LudoState lState = (LudoState) state;
+        lState.getDetails().setCurrentPlayerId("p1");
+        lState.getDetails().setCurrentColor(LudoState.Color.RED);
+
+        // Piece 0 at step 55 (needs 2 to reach home goal 57)
+        LudoState.PlayerState p1State = lState.getDetails().getPlayerStates().get("p1");
+        LudoState.Piece piece0 = p1State.getPieces().get(0);
+        piece0.setInYard(false);
+        piece0.setStep(55);
+
+        lState.getDetails().setTurnPhase(LudoState.TurnPhase.MOVING);
+        lState.getDetails().setLastDiceRoll(2); // Non-6 roll
+        lState.getDetails().setMovablePieceIndices(List.of(0));
+
+        GameResult result = engine.processAction(lState, player1, new LudoAction(LudoAction.MOVE_PIECE, 0));
+        assertTrue(result.isSuccessful());
+        LudoState updatedState = (LudoState) result.getNewState();
+
+        assertEquals(GameStatus.IN_PROGRESS, updatedState.getStatus());
+        assertTrue(updatedState.getDetails().getPlayerStates().get("p1").getPieces().get(0).isFinished());
+        assertEquals(57, updatedState.getDetails().getPlayerStates().get("p1").getPieces().get(0).getStep());
+        assertEquals(1, updatedState.getDetails().getPlayerStates().get("p1").getPiecesFinished());
+
+        // Player 1 gets a bonus turn for reaching home even on non-6 roll
+        assertEquals("p1", updatedState.getDetails().getCurrentPlayerId());
+        assertEquals(LudoState.TurnPhase.ROLLING, updatedState.getDetails().getTurnPhase());
+    }
+
+    @Test
     @DisplayName("shouldDeclareWinnerWhenAllPiecesReachHome")
     void shouldDeclareWinnerWhenAllPiecesReachHome() {
         GameState<LudoState.Details> state = engine.createGame("ludo-1", List.of(player1, player2), engine.defaultConfiguration());

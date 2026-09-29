@@ -193,6 +193,59 @@ class SnakeGameEngineTest {
     }
 
     @Test
+    @DisplayName("shouldContinueMultiplayerGameWhenFirstPlayerReachesOneHundredUntilOneRemains")
+    void shouldContinueMultiplayerGameWhenFirstPlayerReachesOneHundredUntilOneRemains() {
+        GameState<SnakeState.Details> state = engine.createGame("snake-3p", List.of(player1, player2, player3), engine.defaultConfiguration());
+        SnakeState sState = (SnakeState) state;
+        sState.getDetails().getPlayers().get("p1").setPosition(95);
+        sState.getDetails().getPlayers().get("p2").setPosition(90);
+        sState.getDetails().getPlayers().get("p3").setPosition(80);
+
+        // Player 1 (Alice) rolls 5 -> reaches 100!
+        GameResult res1 = engine.processAction(sState, player1, new SnakeAction(SnakeAction.ROLL_DICE, 5));
+        assertTrue(res1.isSuccessful());
+        SnakeState stateAfterP1 = (SnakeState) res1.getNewState();
+
+        // 2 players (Bob, Charlie) are still on the board (< 100), so game remains IN_PROGRESS!
+        assertEquals(GameStatus.IN_PROGRESS, stateAfterP1.getStatus());
+        assertEquals("p1", stateAfterP1.getWinner()); // 1st winner recorded
+        assertEquals(1, stateAfterP1.getDetails().getPlayers().get("p1").getRank());
+        assertEquals(100, stateAfterP1.getDetails().getPlayers().get("p1").getPosition());
+
+        // Turn must pass to Bob (p2), skipping finished Alice (p1)
+        assertEquals("p2", stateAfterP1.getDetails().getCurrentPlayerId());
+
+        // Alice cannot roll anymore since she finished
+        assertFalse(engine.isValidAction(stateAfterP1, player1, new SnakeAction(SnakeAction.ROLL_DICE, 3)));
+
+        // Bob (p2) is at 90, rolls 4 -> moves to 94. Turn passes to Charlie (p3)
+        GameResult res2 = engine.processAction(stateAfterP1, player2, new SnakeAction(SnakeAction.ROLL_DICE, 4));
+        assertTrue(res2.isSuccessful());
+        SnakeState stateAfterP2 = (SnakeState) res2.getNewState();
+        assertEquals(GameStatus.IN_PROGRESS, stateAfterP2.getStatus());
+        assertEquals(94, stateAfterP2.getDetails().getPlayers().get("p2").getPosition());
+        assertEquals("p3", stateAfterP2.getDetails().getCurrentPlayerId());
+
+        // Charlie (p3) is at 80, rolls 2 -> moves to 82. Turn skips finished Alice and passes back to Bob (p2)
+        GameResult res3 = engine.processAction(stateAfterP2, player3, new SnakeAction(SnakeAction.ROLL_DICE, 2));
+        assertTrue(res3.isSuccessful());
+        SnakeState stateAfterP3 = (SnakeState) res3.getNewState();
+        assertEquals(GameStatus.IN_PROGRESS, stateAfterP3.getStatus());
+        assertEquals("p2", stateAfterP3.getDetails().getCurrentPlayerId());
+
+        // Bob (p2) is at 94, rolls 6 -> reaches 100! Now only Charlie remains (< 100) on board -> GAME FINISHED!
+        GameResult res4 = engine.processAction(stateAfterP3, player2, new SnakeAction(SnakeAction.ROLL_DICE, 6));
+        assertTrue(res4.isSuccessful());
+        SnakeState finalState = (SnakeState) res4.getNewState();
+
+        assertEquals(GameStatus.FINISHED, finalState.getStatus());
+        assertEquals("p1", finalState.getWinner());
+        assertEquals(1, finalState.getDetails().getPlayers().get("p1").getRank());
+        assertEquals(2, finalState.getDetails().getPlayers().get("p2").getRank());
+        assertEquals(3, finalState.getDetails().getPlayers().get("p3").getRank());
+    }
+
+    @Test
     @DisplayName("shouldDeclareRemainingPlayerWinnerOnDisconnect")
     void shouldDeclareRemainingPlayerWinnerOnDisconnect() {
         GameState<SnakeState.Details> state = engine.createGame("snake-1", List.of(player1, player2), engine.defaultConfiguration());
