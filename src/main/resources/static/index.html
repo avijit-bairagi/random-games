@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/css/games/snake.css">
     <link rel="stylesheet" href="/css/games/chess.css">
     <link rel="stylesheet" href="/css/games/callbridge.css">
+    <link rel="stylesheet" href="/css/games/twentynine.css">
     <link rel="stylesheet" href="/css/common/modal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -80,6 +81,13 @@
                             <span class="game-chip-players">4 Players</span>
                         </div>
                     </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">🃏</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Twenty-Nine (29)</span>
+                            <span class="game-chip-players">4 Players</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-container welcome-form">
@@ -104,6 +112,7 @@
                         <button class="tab-btn" data-game="SNAKE">🐍 Snake and Ladder</button>
                         <button class="tab-btn" data-game="CHESS">♟️ Chess</button>
                         <button class="tab-btn" data-game="CALL_BRIDGE">♠️ Call Bridge</button>
+                        <button class="tab-btn" data-game="TWENTY_NINE">🃏 Twenty-Nine</button>
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
@@ -402,10 +411,138 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- Twenty-Nine (29) Board -->
+                        <div id="twentyNineBoardContainer" class="board-container tn-container" style="display: none;">
+                            <div class="tn-header-bar">
+                                <div class="tn-round-info">
+                                    <span id="tnBidText">Bid: -</span>
+                                    <span id="tnTrumpBadge" class="tn-trump-badge" style="display:none;">🂠 Trump: Hidden</span>
+                                    <span id="tnTrickText" style="color:var(--text-muted); font-size:0.85rem;">Trick 1 / 8</span>
+                                    <span id="tnDoubleBadge" class="tn-double-badge" style="display:none;">✖️ Doubled</span>
+                                </div>
+                                <div id="tnTrumpCardContainer" class="tn-trump-card-container" style="display:none;">
+                                    <div id="tnTrumpCard" class="tn-card">
+                                        <div class="tn-card-rank">?</div>
+                                        <div class="tn-card-suit">?</div>
+                                    </div>
+                                </div>
+                                <div class="turn-indicator tn-turn-banner" id="tnTurnIndicator">⏳ Waiting for game to start...</div>
+                            </div>
+
+                            <div class="tn-table">
+                                <!-- North Pod -->
+                                <div class="tn-player-pod tn-pod-north" id="tnPod_north">
+                                    <div class="tn-pod-name">North</div>
+                                    <div class="tn-pod-stats">
+                                        <span class="tn-pod-stat-item">Team: <strong class="tn-stat-team">-</strong></span>
+                                        <span class="tn-pod-stat-item">GP: <strong class="tn-stat-gp">0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- West Pod -->
+                                <div class="tn-player-pod tn-pod-west" id="tnPod_west">
+                                    <div class="tn-pod-name">West</div>
+                                    <div class="tn-pod-stats">
+                                        <span class="tn-pod-stat-item">Team: <strong class="tn-stat-team">-</strong></span>
+                                        <span class="tn-pod-stat-item">GP: <strong class="tn-stat-gp">0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- East Pod -->
+                                <div class="tn-player-pod tn-pod-east" id="tnPod_east">
+                                    <div class="tn-pod-name">East</div>
+                                    <div class="tn-pod-stats">
+                                        <span class="tn-pod-stat-item">Team: <strong class="tn-stat-team">-</strong></span>
+                                        <span class="tn-pod-stat-item">GP: <strong class="tn-stat-gp">0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- South Pod (You) -->
+                                <div class="tn-player-pod tn-pod-south" id="tnPod_south">
+                                    <div class="tn-pod-name">You</div>
+                                    <div class="tn-pod-stats">
+                                        <span class="tn-pod-stat-item">Team: <strong class="tn-stat-team">-</strong></span>
+                                        <span class="tn-pod-stat-item">GP: <strong class="tn-stat-gp">0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- Trick Center Arena -->
+                                <div class="tn-trick-arena" id="tnTrickArena">
+                                    <div class="tn-trick-card-slot tn-slot-north" id="tnSlot_north"></div>
+                                    <div class="tn-trick-card-slot tn-slot-west" id="tnSlot_west"></div>
+                                    <div class="tn-trick-card-slot tn-slot-east" id="tnSlot_east"></div>
+                                    <div class="tn-trick-card-slot tn-slot-south" id="tnSlot_south"></div>
+                                </div>
+                            </div>
+
+                            <!-- Bidding Panel -->
+                            <div class="tn-bidding-panel" id="tnBiddingPanel" style="display: none;">
+                                <div class="tn-bidding-title">📢 Your Turn: Place Your Bid (15–28) or Pass</div>
+                                <div class="tn-bidding-buttons" id="tnBiddingButtons">
+                                    <!-- Populated dynamically -->
+                                </div>
+                                <button class="tn-pass-btn" id="tnPassBtn" onclick="tnPass()">Pass</button>
+                                <button class="tn-double-btn" id="tnDoubleBtn" onclick="tnDouble()" style="display:none;">✖️ Double</button>
+                                <button class="tn-redouble-btn" id="tnRedoubleBtn" onclick="tnRedouble()" style="display:none;">✖️✖️ Redouble</button>
+                            </div>
+
+                            <!-- Trump Selection Panel -->
+                            <div class="tn-trump-panel" id="tnTrumpPanel" style="display: none;">
+                                <div class="tn-bidding-title">🂠 Select Your Secret Trump Suit</div>
+                                <div class="tn-trump-buttons">
+                                    <button class="tn-trump-btn hearts" onclick="tnSelectTrump('HEARTS')">♥ Hearts</button>
+                                    <button class="tn-trump-btn diamonds" onclick="tnSelectTrump('DIAMONDS')">♦ Diamonds</button>
+                                    <button class="tn-trump-btn clubs" onclick="tnSelectTrump('CLUBS')">♣ Clubs</button>
+                                    <button class="tn-trump-btn spades" onclick="tnSelectTrump('SPADES')">♠ Spades</button>
+                                </div>
+                            </div>
+
+                            <!-- Double/Redouble Panel -->
+                            <div class="tn-double-panel" id="tnDoublePanel">
+                                <button class="tn-double-btn" id="tnDoubleBtn" onclick="tnDouble()" style="display:none;">✖️ Double</button>
+                                <button class="tn-redouble-btn" id="tnRedoubleBtn" onclick="tnRedouble()" style="display:none;">✖️✖️ Redouble</button>
+                                <button class="tn-reveal-trump-btn" id="tnRevealTrumpBtn" onclick="tnRequestTrump()" style="display:none;">🂠 Reveal Trump</button>
+                            </div>
+
+                            <!-- Hand Container -->
+                            <div class="tn-hand-container" id="tnHandContainer"></div>
+
+                            <!-- Scoreboard -->
+                            <div class="tn-scoreboard-box">
+                                <table class="tn-score-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Team</th>
+                                            <th>Game Points</th>
+                                            <th>Round Card Pts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tnScoreTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </section>
         </main>
+
+        <!-- Twenty-Nine Round Summary Modal -->
+        <div id="tnRoundSummaryModal" class="modal-backdrop" style="display:none;align-items:center;justify-content:center;">
+            <div class="modal-card" style="max-width:420px;width:95%;">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-icon">📊</span>
+                        <h3>Round Summary</h3>
+                    </div>
+                </div>
+                <div class="modal-body" id="tnRoundSummaryBody" style="padding:16px 20px;"></div>
+                <div class="modal-footer" style="padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;">
+                    <button id="tnRoundSummaryContinueBtn" class="btn btn-primary" onclick="tnContinue()">▶ Next Round</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Create Room Modal -->
         <div id="createRoomModal" class="modal-backdrop" style="display: none;">
@@ -430,6 +567,7 @@
                             <option value="SNAKE">🐍 Snake and Ladder (2, 3, or 4 Players)</option>
                             <option value="CHESS">♟️ Chess (2 Players)</option>
                             <option value="CALL_BRIDGE">♠️ Call Bridge (4 Players)</option>
+                            <option value="TWENTY_NINE">🃏 Twenty-Nine / 29 (4 Players)</option>
                         </select>
                     </div>
                     <div class="input-group" id="maxPlayersGroup">
@@ -437,6 +575,13 @@
                         <select id="maxPlayersInput">
                             <option value="2">2 Players</option>
                         </select>
+                    </div>
+                    <!-- Twenty-Nine configuration options -->
+                    <div id="tnConfigGroup" style="display: none;">
+                        <div class="input-group">
+                            <label for="tnTargetPointsInput">Game Points to Win</label>
+                            <input type="text" inputmode="numeric" id="tnTargetPointsInput" value="6">
+                        </div>
                     </div>
                     <!-- Call Bridge win condition options -->
                     <div id="cbWinConditionGroup" style="display: none;">
@@ -508,6 +653,7 @@
     <script src="/js/games/ludo.js"></script>
     <script src="/js/games/snake.js"></script>
     <script src="/js/games/callbridge.js"></script>
+    <script src="/js/games/twentynine.js"></script>
     <script src="/js/common/lobby.js"></script>
 </body>
 </html>

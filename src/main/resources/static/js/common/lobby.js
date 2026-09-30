@@ -102,9 +102,13 @@ function updateMaxPlayersOptions() {
         el.maxPlayersInput.innerHTML = `<option value="2" selected>2 Players</option>`;
     } else if (val === 'CALL_BRIDGE') {
         el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
+    } else if (val === 'TWENTY_NINE') {
+        el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
     }
     const cbGroup = document.getElementById('cbWinConditionGroup');
     if (cbGroup) cbGroup.style.display = val === 'CALL_BRIDGE' ? 'block' : 'none';
+    const tnGroup = document.getElementById('tnConfigGroup');
+    if (tnGroup) tnGroup.style.display = val === 'TWENTY_NINE' ? 'block' : 'none';
 }
 
 function updateCbWinConditionInput() {
@@ -169,6 +173,24 @@ function formatGameEvent(evt) {
         logEvent(`🃏 Cards dealt for round ${evt.payload.round}`);
     } else if (evt.eventType === 'PLAYER_FORFEIT') {
         logEvent(`🚪 A player forfeited the game.`, 'error');
+    } else if (evt.eventType === 'BID_PASSED') {
+        logEvent(`⏭️ A player passed the bid.`);
+    } else if (evt.eventType === 'DEALER_FORCED_BID') {
+        logEvent(`🎲 Dealer forced to bid 15!`, 'important');
+    } else if (evt.eventType === 'BIDDING_COMPLETE') {
+        const winnerName = (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[evt.payload.highestBidderId])
+            ? state.currentRoom.playerNames[evt.payload.highestBidderId] : evt.payload.highestBidderId;
+        logEvent(`✅ Bidding complete! ${winnerName} won with bid ${evt.payload.currentBid}`, 'important');
+    } else if (evt.eventType === 'TRUMP_SELECTED') {
+        logEvent(`🂠 Trump suit selected (secret)`, 'important');
+    } else if (evt.eventType === 'TRUMP_REVEALED') {
+        logEvent(`🂠 Trump revealed: ${evt.payload.trumpSuit}!`, 'important');
+    } else if (evt.eventType === 'DOUBLED') {
+        logEvent(`✖️ A player doubled the bid!`, 'important');
+    } else if (evt.eventType === 'REDOUBLED') {
+        logEvent(`✖️✖️ A player redoubled!`, 'important');
+    } else if (evt.eventType === 'NEW_ROUND') {
+        logEvent(`🔄 New round started!`, 'important');
     }
 }
 
