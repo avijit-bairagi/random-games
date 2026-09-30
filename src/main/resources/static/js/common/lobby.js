@@ -100,7 +100,19 @@ function updateMaxPlayersOptions() {
         `;
     } else if (val === 'CHESS') {
         el.maxPlayersInput.innerHTML = `<option value="2" selected>2 Players</option>`;
+    } else if (val === 'CALL_BRIDGE') {
+        el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
     }
+    const cbGroup = document.getElementById('cbWinConditionGroup');
+    if (cbGroup) cbGroup.style.display = val === 'CALL_BRIDGE' ? 'block' : 'none';
+}
+
+function updateCbWinConditionInput() {
+    const val = document.getElementById('cbWinConditionSelect')?.value;
+    const roundsGroup = document.getElementById('cbRoundsGroup');
+    const pointsGroup = document.getElementById('cbPointsGroup');
+    if (roundsGroup) roundsGroup.style.display = val === 'POINTS' ? 'none' : 'block';
+    if (pointsGroup) pointsGroup.style.display = val === 'POINTS' ? 'block' : 'none';
 }
 
 function openCreateRoomModal() {
@@ -138,6 +150,25 @@ function formatGameEvent(evt) {
         logEvent(`🏆 ${evt.payload.winner} won the match!`, 'important');
     } else if (evt.eventType === 'PIECE_CAPTURED') {
         logEvent(`⚔️ Piece captured at cell ${evt.payload.globalPosition}!`, 'important');
+    } else if (evt.eventType === 'BID_PLACED') {
+        logEvent(`🃏 ${evt.payload.player} bid ${evt.payload.bid} trick(s)`);
+    } else if (evt.eventType === 'BIDDING_COMPLETED') {
+        logEvent(`✅ All bids placed — game begins!`, 'important');
+    } else if (evt.eventType === 'CARD_PLAYED') {
+        const c = evt.payload.card;
+        const cardStr = c ? `${c.rank} of ${c.suit}` : 'a card';
+        logEvent(`🃏 ${evt.payload.player} played ${cardStr}`);
+    } else if (evt.eventType === 'TRICK_WON') {
+        const winnerName = (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[evt.payload.winnerId])
+            ? state.currentRoom.playerNames[evt.payload.winnerId]
+            : evt.payload.winnerId;
+        logEvent(`🏅 Trick ${evt.payload.trickNumber} won by ${winnerName}!`, 'important');
+    } else if (evt.eventType === 'ROUND_FINISHED') {
+        logEvent(`🔄 Round ${evt.payload.round} finished!`, 'important');
+    } else if (evt.eventType === 'CARDS_DEALT') {
+        logEvent(`🃏 Cards dealt for round ${evt.payload.round}`);
+    } else if (evt.eventType === 'PLAYER_FORFEIT') {
+        logEvent(`🚪 A player forfeited the game.`, 'error');
     }
 }
 

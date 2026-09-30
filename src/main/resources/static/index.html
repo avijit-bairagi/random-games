@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/css/games/ludo.css">
     <link rel="stylesheet" href="/css/games/snake.css">
     <link rel="stylesheet" href="/css/games/chess.css">
+    <link rel="stylesheet" href="/css/games/callbridge.css">
     <link rel="stylesheet" href="/css/common/modal.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -72,6 +73,13 @@
                             <span class="game-chip-players">2 Players</span>
                         </div>
                     </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">♠️</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Call Bridge</span>
+                            <span class="game-chip-players">4 Players</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-container welcome-form">
@@ -95,6 +103,7 @@
                         <button class="tab-btn" data-game="LUDO">🎲 Ludo</button>
                         <button class="tab-btn" data-game="SNAKE">🐍 Snake and Ladder</button>
                         <button class="tab-btn" data-game="CHESS">♟️ Chess</button>
+                        <button class="tab-btn" data-game="CALL_BRIDGE">♠️ Call Bridge</button>
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
@@ -292,6 +301,107 @@
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
+
+                        <!-- Call Bridge Board -->
+                        <div id="callBridgeBoardContainer" class="board-container callbridge-container" style="display: none;">
+                            <div class="cb-header-bar">
+                                <div class="cb-round-info">
+                                    <span id="cbRoundText">Round 1 / 5</span>
+                                    <span class="cb-trump-badge">♠️ Trump: Spades</span>
+                                    <span id="cbTrickText" style="color:var(--text-muted); font-size:0.85rem;">Trick 1 / 13</span>
+                                </div>
+                                <div class="turn-indicator cb-turn-banner" id="cbTurnIndicator">⏳ Waiting for game to start...</div>
+                            </div>
+
+                            <div class="cb-table">
+                                <!-- North Pod -->
+                                <div class="cb-player-pod cb-pod-north" id="cbPod_north">
+                                    <div class="cb-pod-name">North</div>
+                                    <div class="cb-pod-stats">
+                                        <span class="cb-pod-stat-item">Bid: <strong class="cb-stat-bid">-</strong></span>
+                                        <span class="cb-pod-stat-item">Won: <strong class="cb-stat-won">0</strong></span>
+                                        <span class="cb-pod-stat-item">Pts: <strong class="cb-stat-score">0.0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- West Pod -->
+                                <div class="cb-player-pod cb-pod-west" id="cbPod_west">
+                                    <div class="cb-pod-name">West</div>
+                                    <div class="cb-pod-stats">
+                                        <span class="cb-pod-stat-item">Bid: <strong class="cb-stat-bid">-</strong></span>
+                                        <span class="cb-pod-stat-item">Won: <strong class="cb-stat-won">0</strong></span>
+                                        <span class="cb-pod-stat-item">Pts: <strong class="cb-stat-score">0.0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- East Pod -->
+                                <div class="cb-player-pod cb-pod-east" id="cbPod_east">
+                                    <div class="cb-pod-name">East</div>
+                                    <div class="cb-pod-stats">
+                                        <span class="cb-pod-stat-item">Bid: <strong class="cb-stat-bid">-</strong></span>
+                                        <span class="cb-pod-stat-item">Won: <strong class="cb-stat-won">0</strong></span>
+                                        <span class="cb-pod-stat-item">Pts: <strong class="cb-stat-score">0.0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- South Pod (You) -->
+                                <div class="cb-player-pod cb-pod-south" id="cbPod_south">
+                                    <div class="cb-pod-name">You</div>
+                                    <div class="cb-pod-stats">
+                                        <span class="cb-pod-stat-item">Bid: <strong class="cb-stat-bid">-</strong></span>
+                                        <span class="cb-pod-stat-item">Won: <strong class="cb-stat-won">0</strong></span>
+                                        <span class="cb-pod-stat-item">Pts: <strong class="cb-stat-score">0.0</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- Trick Center Arena -->
+                                <div class="cb-trick-arena" id="cbTrickArena">
+                                    <div class="cb-trick-card-slot cb-slot-north" id="cbSlot_north"></div>
+                                    <div class="cb-trick-card-slot cb-slot-west" id="cbSlot_west"></div>
+                                    <div class="cb-trick-card-slot cb-slot-east" id="cbSlot_east"></div>
+                                    <div class="cb-trick-card-slot cb-slot-south" id="cbSlot_south"></div>
+                                </div>
+                            </div>
+
+                            <!-- Bidding Panel -->
+                            <div class="cb-bidding-panel" id="cbBiddingPanel" style="display: none;">
+                                <div class="cb-bidding-title">📢 Your Turn: Choose Your Call / Bid</div>
+                                <div class="cb-bidding-buttons">
+                                    <button class="cb-bid-btn" onclick="makeBid(2)">2</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(3)">3</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(4)">4</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(5)">5</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(6)">6</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(7)">7</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(8)">8</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(9)">9</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(10)">10</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(11)">11</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(12)">12</button>
+                                    <button class="cb-bid-btn" onclick="makeBid(13)">13</button>
+                                </div>
+                            </div>
+
+                            <!-- Hand Container -->
+                            <div class="cb-hand-container" id="cbHandContainer"></div>
+
+                            <!-- Scoreboard Box -->
+                            <div class="cb-scoreboard-box">
+                                <table class="cb-score-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Round</th>
+                                            <th id="cbScoreHeaderP1">Player 1</th>
+                                            <th id="cbScoreHeaderP2">Player 2</th>
+                                            <th id="cbScoreHeaderP3">Player 3</th>
+                                            <th id="cbScoreHeaderP4">Player 4</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cbScoreTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -319,6 +429,7 @@
                             <option value="LUDO">🎲 Ludo (2 or 4 Players)</option>
                             <option value="SNAKE">🐍 Snake and Ladder (2, 3, or 4 Players)</option>
                             <option value="CHESS">♟️ Chess (2 Players)</option>
+                            <option value="CALL_BRIDGE">♠️ Call Bridge (4 Players)</option>
                         </select>
                     </div>
                     <div class="input-group" id="maxPlayersGroup">
@@ -326,6 +437,24 @@
                         <select id="maxPlayersInput">
                             <option value="2">2 Players</option>
                         </select>
+                    </div>
+                    <!-- Call Bridge win condition options -->
+                    <div id="cbWinConditionGroup" style="display: none;">
+                        <div class="input-group">
+                            <label for="cbWinConditionSelect">Win Condition</label>
+                            <select id="cbWinConditionSelect" onchange="updateCbWinConditionInput()">
+                                <option value="ROUNDS" selected>Number of Rounds</option>
+                                <option value="POINTS">Point Threshold</option>
+                            </select>
+                        </div>
+                        <div class="input-group" id="cbRoundsGroup">
+                            <label for="cbRoundsInput">Number of Rounds</label>
+                            <input type="text" inputmode="numeric" id="cbRoundsInput" value="5">
+                        </div>
+                        <div class="input-group" id="cbPointsGroup" style="display: none;">
+                            <label for="cbPointsInput">Point Threshold</label>
+                            <input type="text" inputmode="numeric" id="cbPointsInput" value="50">
+                        </div>
                     </div>
                     <div class="input-group-inline custom-checkbox-group">
                         <input type="checkbox" id="allowSpectatorsCheckbox" checked>
@@ -378,6 +507,7 @@
     <script src="/js/games/chess.js"></script>
     <script src="/js/games/ludo.js"></script>
     <script src="/js/games/snake.js"></script>
+    <script src="/js/games/callbridge.js"></script>
     <script src="/js/common/lobby.js"></script>
 </body>
 </html>
