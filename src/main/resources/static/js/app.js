@@ -111,6 +111,9 @@ const el = {
     chessPromotionModal: document.getElementById('chessPromotionModal'),
     chessPromotionChoices: document.getElementById('chessPromotionChoices'),
 
+    // Call Bridge
+    callBridgeBoardContainer: document.getElementById('callBridgeBoardContainer'),
+
     // Game Over Modal
     gameOverModal: document.getElementById('gameOverModal'),
     gameOverIcon: document.getElementById('gameOverIcon'),
@@ -339,6 +342,14 @@ async function handleCreateRoom() {
     const maxPlayers = parseInt(el.maxPlayersInput.value);
     const spectatorAllowed = el.allowSpectatorsCheckbox.checked;
 
+    let configuration = null;
+    if (gameType === 'CALL_BRIDGE') {
+        const winCondition = document.getElementById('cbWinConditionSelect')?.value || 'ROUNDS';
+        const totalRounds = parseInt(document.getElementById('cbRoundsInput')?.value || '5');
+        const pointThreshold = parseInt(document.getElementById('cbPointsInput')?.value || '50');
+        configuration = { winCondition, totalRounds, pointThreshold };
+    }
+
     try {
         const res = await fetch('/api/v1/games/rooms', {
             method: 'POST',
@@ -349,7 +360,8 @@ async function handleCreateRoom() {
                 hostPlayerId: state.player.id,
                 maxPlayers,
                 spectatorAllowed,
-                lateJoinAllowed: false
+                lateJoinAllowed: false,
+                configuration
             })
         });
 
@@ -562,6 +574,7 @@ function formatGameType(gameType) {
         case 'LUDO': return 'Ludo';
         case 'SNAKE': return 'Snake and Ladder';
         case 'CHESS': return 'Chess';
+        case 'CALL_BRIDGE': return 'Call Bridge';
         default: return gameType;
     }
 }
@@ -573,6 +586,7 @@ function getGameIcon(gameType) {
         case 'LUDO': return '🎲';
         case 'SNAKE': return '🐍';
         case 'CHESS': return '♟️';
+        case 'CALL_BRIDGE': return '♠️';
         default: return '🎮';
     }
 }
@@ -599,20 +613,32 @@ function updateGameDetailsBox(room, gameState) {
             gameDesc = 'Match in progress on 100-tile board. Climb ladders, evade snakes, and roll 6 for bonus rolls.';
         } else if (room.gameType === 'CHESS') {
             gameDesc = 'Chess match in progress. Click a piece to select it, then click a destination square to move.';
+        } else if (room.gameType === 'CALL_BRIDGE') {
+            gameDesc = 'Call Bridge match in progress. Bid your tricks, then play cards to win rounds.';
         } else {
             gameDesc = 'Match in progress.';
         }
         el.gameStatusDetails.innerHTML = `<strong>🎮 Match In Progress</strong><p style="margin-top:0.4rem; color:var(--text-muted);">${gameDesc}</p>`;
     } else if (room.status === 'FINISHED' || (gameState && (gameState.status === 'FINISHED' || gameState.status === 'DRAW'))) {
-        const winner = gameState ? gameState.winner : null;
+        const winnerRaw = gameState ? gameState.winner : null;
+        const winnerIdList = winnerRaw ? winnerRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
         let finishMsg = '';
-        if (winner) {
-            const isMe = state.player && winner === state.player.id;
-            const winnerName = (gameState && gameState.details && gameState.details.players && gameState.details.players[winner] && gameState.details.players[winner].username)
-                || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[winner] && gameState.details.playerStates[winner].username)
-                || (room && room.playerNames && room.playerNames[winner])
-                || (isMe ? state.player.username : winner);
-            finishMsg = `🏆 Winner: <strong>${isMe ? 'You (' + escapeHtml(winnerName) + ')' : escapeHtml(winnerName)}</strong>!`;
+        if (winnerIdList.length > 0) {
+            const isMultiWin = winnerIdList.length > 1;
+            const isMe = state.player && winnerIdList.includes(state.player.id);
+            const winnerNames = winnerIdList.map(wId => {
+                const n = (gameState && gameState.details && gameState.details.players && gameState.details.players[wId] && gameState.details.players[wId].username)
+                    || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[wId] && gameState.details.playerStates[wId].username)
+                    || (room && room.playerNames && room.playerNames[wId])
+                    || wId;
+                return n;
+            });
+            const winnerName = winnerNames.join(', ');
+            if (isMultiWin) {
+                finishMsg = `🤝 Tie: <strong>${isMe ? 'You & others' : escapeHtml(winnerName)}</strong>!`;
+            } else {
+                finishMsg = `🏆 Winner: <strong>${isMe ? 'You (' + escapeHtml(winnerNames[0]) + ')' : escapeHtml(winnerName)}</strong>!`;
+            }
         } else if (gameState && gameState.status === 'DRAW') {
             finishMsg = `🤝 Match ended in a draw!`;
         } else {
@@ -711,6 +737,8 @@ function updateRoomState(room) {
         updateGameState(room.gameStateSummary);
     } else if (room.gameType === 'CHESS') {
         renderChess({ status: room.status, details: {} });
+    } else if (room.gameType === 'CALL_BRIDGE') {
+        renderCallBridge({ status: room.status, details: { totalRounds: room.configuration?.totalRounds || 5, winCondition: room.configuration?.winCondition || 'ROUNDS', pointThreshold: room.configuration?.pointThreshold || 50 } });
     }
 }
 
@@ -804,6 +832,7 @@ function setupGameBoardView(gameType) {
     el.ludoBoardContainer.style.display = 'none';
     el.snakeBoardContainer.style.display = 'none';
     el.chessBoardContainer.style.display = 'none';
+    if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'none';
 
     const isWaitingOrReady = state.currentRoom && (state.currentRoom.status === 'WAITING' || state.currentRoom.status === 'READY');
     const waitingText = (state.currentRoom && state.currentRoom.status === 'READY')
@@ -839,6 +868,13 @@ function setupGameBoardView(gameType) {
             el.chessTurnIndicator.style.color = 'var(--text-muted)';
         }
         initChessBoard();
+    } else if (gameType === 'CALL_BRIDGE') {
+        if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'flex';
+        const cbTurnIndicator = document.getElementById('cbTurnIndicator');
+        if (isWaitingOrReady && cbTurnIndicator) {
+            cbTurnIndicator.textContent = waitingText;
+            cbTurnIndicator.style.color = 'var(--text-muted)';
+        }
     }
 }
 
@@ -864,7 +900,11 @@ function updateGameState(gameState, events) {
                 el.restartGameBtn.style.display = 'none';
             }
         }
-        showGameOverModal(gameState, type);
+        if (type === 'CALL_BRIDGE') {
+            setTimeout(() => showGameOverModal(gameState, type), 3000);
+        } else {
+            showGameOverModal(gameState, type);
+        }
     } else if (gameState.status === 'IN_PROGRESS') {
         if (state.currentRoom) {
             state.currentRoom.status = gameState.status;
@@ -893,6 +933,8 @@ function updateGameState(gameState, events) {
         renderSnake(gameState, events);
     } else if (type === 'CHESS') {
         renderChess(gameState);
+    } else if (type === 'CALL_BRIDGE') {
+        renderCallBridge(gameState, events);
     }
 }
 
@@ -906,15 +948,22 @@ function showGameOverModal(gameState, gameType) {
     if (state.lastGameOverShownGameId === matchId) return;
     state.lastGameOverShownGameId = matchId;
 
-    const winnerId = gameState.winner;
-    const isWinner = state.player && winnerId && winnerId === state.player.id;
+    const winnerRaw = gameState.winner;
+    const winnerIds = winnerRaw ? winnerRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const isWinner = state.player && winnerIds.includes(state.player.id);
+    const isMultiWinner = winnerIds.length > 1;
     const isSpectator = state.isSpectator;
     const isHost = state.player && state.currentRoom && state.player.id === state.currentRoom.hostPlayerId && !state.isSpectator;
 
-    const winnerName = (gameState && gameState.details && gameState.details.players && gameState.details.players[winnerId] && gameState.details.players[winnerId].username)
-        || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[winnerId] && gameState.details.playerStates[winnerId].username)
-        || (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[winnerId])
-        || (isWinner ? state.player.username : winnerId);
+    function resolveWinnerName(wId) {
+        return (gameState && gameState.details && gameState.details.players && gameState.details.players[wId] && gameState.details.players[wId].username)
+            || (gameState && gameState.details && gameState.details.playerStates && gameState.details.playerStates[wId] && gameState.details.playerStates[wId].username)
+            || (state.currentRoom && state.currentRoom.playerNames && state.currentRoom.playerNames[wId])
+            || wId;
+    }
+    const winnerId = winnerIds[0] || null;
+    const winnerNames = winnerIds.map(resolveWinnerName);
+    const winnerName = winnerNames.join(', ');
 
     if (isDraw) {
         if (el.gameOverIcon) el.gameOverIcon.textContent = '🤝';
@@ -922,6 +971,12 @@ function showGameOverModal(gameState, gameType) {
         if (el.gameOverTitle) el.gameOverTitle.textContent = 'Match Drawn!';
         if (el.gameOverWinner) el.gameOverWinner.textContent = "It's a Draw!";
         if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Both sides demonstrated equal skill and strategy!';
+    } else if (isWinner && isMultiWinner) {
+        if (el.gameOverIcon) el.gameOverIcon.textContent = '🏆';
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '🤝';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = "It's a Tie! 🎉";
+        if (el.gameOverWinner) el.gameOverWinner.textContent = 'You Won (Tied)!';
+        if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = `Tied with: ${escapeHtml(winnerNames.filter(n => n !== (state.player && state.player.username)).join(', '))}. Congratulations!`;
     } else if (isWinner) {
         if (el.gameOverIcon) el.gameOverIcon.textContent = '🏆';
         if (el.gameOverTrophy) el.gameOverTrophy.textContent = '👑';
@@ -932,13 +987,13 @@ function showGameOverModal(gameState, gameType) {
         if (el.gameOverIcon) el.gameOverIcon.textContent = '🏁';
         if (el.gameOverTrophy) el.gameOverTrophy.textContent = '🏆';
         if (el.gameOverTitle) el.gameOverTitle.textContent = 'Match Finished!';
-        if (el.gameOverWinner) el.gameOverWinner.textContent = `${winnerName ? escapeHtml(winnerName) : 'Player'} Won!`;
+        if (el.gameOverWinner) el.gameOverWinner.textContent = isMultiWinner ? `${winnerName ? escapeHtml(winnerName) : 'Players'} Tied!` : `${winnerName ? escapeHtml(winnerName) : 'Player'} Won!`;
         if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Game concluded. Spectator mode active.';
     } else {
         if (el.gameOverIcon) el.gameOverIcon.textContent = '🏁';
-        if (el.gameOverTrophy) el.gameOverTrophy.textContent = '👑';
-        if (el.gameOverTitle) el.gameOverTitle.textContent = 'Game Over';
-        if (el.gameOverWinner) el.gameOverWinner.textContent = `${winnerName ? escapeHtml(winnerName) : 'Winner'} Wins!`;
+        if (el.gameOverTrophy) el.gameOverTrophy.textContent = isMultiWinner ? '🤝' : '👑';
+        if (el.gameOverTitle) el.gameOverTitle.textContent = isMultiWinner ? "It's a Tie!" : 'Game Over';
+        if (el.gameOverWinner) el.gameOverWinner.textContent = isMultiWinner ? `${winnerName ? escapeHtml(winnerName) : 'Players'} Tied!` : `${winnerName ? escapeHtml(winnerName) : 'Winner'} Wins!`;
         if (el.gameOverSubtitle) el.gameOverSubtitle.textContent = 'Great match! Better luck next time.';
     }
 
@@ -946,6 +1001,20 @@ function showGameOverModal(gameState, gameType) {
         let detailsHtml = `<strong>${getGameIcon(gameType)} ${formatGameType(gameType)}</strong>`;
         if (winnerName) {
             detailsHtml += ` &bull; Winner: <span style="color:var(--accent); font-weight:700;">${escapeHtml(winnerName)}</span>`;
+        }
+        // Show player scores for Call Bridge
+        if (gameType === 'CALL_BRIDGE' && gameState.details && gameState.details.totalScores) {
+            const scores = gameState.details.totalScores;
+            const playerNames = state.currentRoom && state.currentRoom.playerNames ? state.currentRoom.playerNames : {};
+            const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+            detailsHtml += '<table style="width:100%;margin-top:10px;border-collapse:collapse;font-size:0.95em">';
+            detailsHtml += '<tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Player</th><th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">Score</th></tr>';
+            for (const [pid, score] of sorted) {
+                const name = escapeHtml(playerNames[pid] || pid);
+                const isWin = winnerIds.includes(pid);
+                detailsHtml += `<tr><td style="padding:4px 8px">${isWin ? '🏆 ' : ''}${name}</td><td style="text-align:right;padding:4px 8px;font-weight:${isWin ? '700' : '400'};color:${isWin ? 'var(--accent)' : 'inherit'}">${score}</td></tr>`;
+            }
+            detailsHtml += '</table>';
         }
         el.gameOverDetails.innerHTML = detailsHtml;
     }
