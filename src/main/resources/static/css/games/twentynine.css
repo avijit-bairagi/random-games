@@ -1,0 +1,452 @@
+/* ======================== TWENTY-NINE (29) STYLES ======================== */
+
+.tn-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface, #1e2130);
+    border-radius: 12px;
+    min-height: 500px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Header Bar */
+.tn-header-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface2, #252840);
+    border-radius: 8px;
+}
+
+.tn-trump-card-container {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(0,0,0,0.2);
+    padding: 4px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.tn-trump-card-container .tn-card {
+    width: 60px;
+    height: 88px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    margin: 0;
+    cursor: default;
+}
+
+.tn-trump-card-container .tn-card .tn-card-rank {
+    font-size: 1.4rem;
+}
+
+.tn-trump-card-container .tn-card .tn-card-suit {
+    font-size: 1.8rem;
+}
+
+.tn-round-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text, #e2e8f0);
+}
+
+.tn-trump-badge {
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.tn-double-badge {
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: rgba(229, 62, 62, 0.15);
+    border: 1px solid rgba(229, 62, 62, 0.4);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.tn-turn-banner {
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+}
+
+/* Table Layout */
+.tn-table {
+    position: relative;
+    display: grid;
+    grid-template-areas:
+        ". north ."
+        "west center east"
+        ". south .";
+    grid-template-columns: 1fr 2fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 0.5rem;
+    min-height: 280px;
+    background: radial-gradient(ellipse at center, #1a3a2a 0%, #0f1f17 100%);
+    border-radius: 16px;
+    padding: 0.75rem;
+    border: 2px solid rgba(255,255,255,0.06);
+}
+
+/* Player Pods */
+.tn-player-pod {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-size: 0.8rem;
+}
+
+.tn-player-pod.active-turn {
+    border-color: #f59e0b;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.tn-player-pod.tn-passed {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+}
+
+.tn-pod-north { grid-area: north; }
+.tn-pod-south { grid-area: south; }
+.tn-pod-west  { grid-area: west; }
+.tn-pod-east  { grid-area: east; }
+
+.tn-pod-name {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--text, #e2e8f0);
+    text-align: center;
+}
+
+.tn-pod-stats {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.tn-pod-stat-item {
+    font-size: 0.75rem;
+    color: var(--text-muted, #94a3b8);
+}
+
+/* Trick Arena */
+.tn-trick-arena {
+    grid-area: center;
+    position: relative;
+    display: grid;
+    grid-template-areas:
+        ". north ."
+        "west . east"
+        ". south .";
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 4px;
+    align-items: center;
+    justify-items: center;
+    min-height: 160px;
+}
+
+.tn-trick-card-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tn-slot-north { grid-area: north; }
+.tn-slot-south { grid-area: south; }
+.tn-slot-west  { grid-area: west; }
+.tn-slot-east  { grid-area: east; }
+
+/* Cards */
+.tn-card {
+    width: 52px;
+    height: 76px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+}
+
+.tn-card.playable:hover {
+    transform: translateY(-6px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    border-color: #f59e0b;
+}
+
+.tn-card.unplayable {
+    opacity: 0.45;
+    filter: grayscale(0.4);
+}
+
+.tn-card.winner-glow {
+    box-shadow: 0 0 14px 4px rgba(245, 158, 11, 0.7);
+    border-color: #f59e0b;
+}
+
+.tn-card-rank {
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.tn-card-suit {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.tn-card-pts {
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #6b7280;
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+/* Bidding Panel */
+.tn-bidding-panel {
+    background: var(--surface2, #252840);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tn-bidding-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #f59e0b;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.tn-bidding-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.tn-bid-btn {
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.tn-bid-btn:hover {
+    background: rgba(245, 158, 11, 0.25);
+    transform: scale(1.08);
+}
+
+.tn-pass-btn {
+    display: block;
+    margin: 0 auto;
+    padding: 0.35rem 1.2rem;
+    border-radius: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--text-muted, #94a3b8);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.tn-pass-btn:hover {
+    background: rgba(148, 163, 184, 0.2);
+}
+
+/* Trump Selection Panel */
+.tn-trump-panel {
+    background: var(--surface2, #252840);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    text-align: center;
+}
+
+.tn-trump-buttons {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.tn-trump-btn {
+    padding: 0.5rem 1.1rem;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.tn-trump-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.tn-trump-btn.hearts, .tn-trump-btn.diamonds {
+    background: #fff0f0;
+    color: #e53e3e;
+    border-color: #e53e3e;
+}
+
+.tn-trump-btn.clubs, .tn-trump-btn.spades {
+    background: #f0f0f0;
+    color: #1a202c;
+    border-color: #1a202c;
+}
+
+/* Double/Redouble Panel */
+.tn-double-panel {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.tn-double-btn, .tn-redouble-btn, .tn-reveal-trump-btn {
+    padding: 0.35rem 0.9rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    border: 1px solid;
+}
+
+.tn-double-btn {
+    background: rgba(229, 62, 62, 0.12);
+    color: #e53e3e;
+    border-color: rgba(229, 62, 62, 0.5);
+}
+
+.tn-double-btn:hover { background: rgba(229, 62, 62, 0.25); transform: scale(1.05); }
+
+.tn-redouble-btn {
+    background: rgba(229, 62, 62, 0.2);
+    color: #e53e3e;
+    border-color: #e53e3e;
+}
+
+.tn-redouble-btn:hover { background: rgba(229, 62, 62, 0.35); transform: scale(1.05); }
+
+.tn-reveal-trump-btn {
+    background: rgba(139, 92, 246, 0.12);
+    color: #8b5cf6;
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.tn-reveal-trump-btn:hover { background: rgba(139, 92, 246, 0.25); transform: scale(1.05); }
+
+/* Hand Container */
+.tn-hand-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: center;
+    padding: 0.5rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    min-height: 90px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.tn-no-cards {
+    color: var(--text-muted, #94a3b8);
+    font-size: 0.85rem;
+    align-self: center;
+}
+
+/* Scoreboard */
+.tn-scoreboard-box {
+    background: var(--surface2, #252840);
+    border-radius: 8px;
+    padding: 0.5rem;
+    overflow-x: auto;
+}
+
+.tn-score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    color: var(--text, #e2e8f0);
+}
+
+.tn-score-table th {
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    text-align: left;
+    color: var(--text-muted, #94a3b8);
+    font-weight: 600;
+}
+
+.tn-score-table td {
+    padding: 0.3rem 0.6rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .tn-table {
+        grid-template-columns: 80px 1fr 80px;
+        min-height: 220px;
+    }
+    .tn-card { width: 42px; height: 62px; }
+    .tn-card-rank { font-size: 0.9rem; }
+    .tn-card-suit { font-size: 1rem; }
+    .tn-trump-card-container {
+        position: relative;
+        top: 0;
+        right: 0;
+        transform: none;
+        margin: 0.5rem auto;
+    }
+}

@@ -114,6 +114,9 @@ const el = {
     // Call Bridge
     callBridgeBoardContainer: document.getElementById('callBridgeBoardContainer'),
 
+    // Twenty-Nine
+    twentyNineBoardContainer: document.getElementById('twentyNineBoardContainer'),
+
     // Game Over Modal
     gameOverModal: document.getElementById('gameOverModal'),
     gameOverIcon: document.getElementById('gameOverIcon'),
@@ -348,6 +351,9 @@ async function handleCreateRoom() {
         const totalRounds = parseInt(document.getElementById('cbRoundsInput')?.value || '5');
         const pointThreshold = parseInt(document.getElementById('cbPointsInput')?.value || '50');
         configuration = { winCondition, totalRounds, pointThreshold };
+    } else if (gameType === 'TWENTY_NINE') {
+        const targetGamePoints = parseInt(document.getElementById('tnTargetPointsInput')?.value || '6');
+        configuration = { targetGamePoints };
     }
 
     try {
@@ -575,6 +581,7 @@ function formatGameType(gameType) {
         case 'SNAKE': return 'Snake and Ladder';
         case 'CHESS': return 'Chess';
         case 'CALL_BRIDGE': return 'Call Bridge';
+        case 'TWENTY_NINE': return 'Twenty-Nine (29)';
         default: return gameType;
     }
 }
@@ -587,6 +594,7 @@ function getGameIcon(gameType) {
         case 'SNAKE': return '🐍';
         case 'CHESS': return '♟️';
         case 'CALL_BRIDGE': return '♠️';
+        case 'TWENTY_NINE': return '🃏';
         default: return '🎮';
     }
 }
@@ -615,6 +623,8 @@ function updateGameDetailsBox(room, gameState) {
             gameDesc = 'Chess match in progress. Click a piece to select it, then click a destination square to move.';
         } else if (room.gameType === 'CALL_BRIDGE') {
             gameDesc = 'Call Bridge match in progress. Bid your tricks, then play cards to win rounds.';
+        } else if (room.gameType === 'TWENTY_NINE') {
+            gameDesc = 'Twenty-Nine match in progress. Bid 15-28, select secret trump, and capture card points for your team.';
         } else {
             gameDesc = 'Match in progress.';
         }
@@ -833,6 +843,7 @@ function setupGameBoardView(gameType) {
     el.snakeBoardContainer.style.display = 'none';
     el.chessBoardContainer.style.display = 'none';
     if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'none';
+    if (el.twentyNineBoardContainer) el.twentyNineBoardContainer.style.display = 'none';
 
     const isWaitingOrReady = state.currentRoom && (state.currentRoom.status === 'WAITING' || state.currentRoom.status === 'READY');
     const waitingText = (state.currentRoom && state.currentRoom.status === 'READY')
@@ -875,6 +886,13 @@ function setupGameBoardView(gameType) {
             cbTurnIndicator.textContent = waitingText;
             cbTurnIndicator.style.color = 'var(--text-muted)';
         }
+    } else if (gameType === 'TWENTY_NINE') {
+        if (el.twentyNineBoardContainer) el.twentyNineBoardContainer.style.display = 'flex';
+        const tnTurnIndicator = document.getElementById('tnTurnIndicator');
+        if (isWaitingOrReady && tnTurnIndicator) {
+            tnTurnIndicator.textContent = waitingText;
+            tnTurnIndicator.style.color = 'var(--text-muted)';
+        }
     }
 }
 
@@ -900,7 +918,7 @@ function updateGameState(gameState, events) {
                 el.restartGameBtn.style.display = 'none';
             }
         }
-        if (type === 'CALL_BRIDGE') {
+        if (type === 'CALL_BRIDGE' || type === 'TWENTY_NINE') {
             setTimeout(() => showGameOverModal(gameState, type), 3000);
         } else {
             showGameOverModal(gameState, type);
@@ -935,6 +953,8 @@ function updateGameState(gameState, events) {
         renderChess(gameState);
     } else if (type === 'CALL_BRIDGE') {
         renderCallBridge(gameState, events);
+    } else if (type === 'TWENTY_NINE') {
+        renderTwentyNine(gameState, events);
     }
 }
 
@@ -1003,7 +1023,19 @@ function showGameOverModal(gameState, gameType) {
             detailsHtml += ` &bull; Winner: <span style="color:var(--accent); font-weight:700;">${escapeHtml(winnerName)}</span>`;
         }
         // Show player scores for Call Bridge
-        if (gameType === 'CALL_BRIDGE' && gameState.details && gameState.details.totalScores) {
+        if (gameType === 'TWENTY_NINE' && gameState.details && gameState.details.gamePoints) {
+            const gp = gameState.details.gamePoints;
+            const playerOrder = gameState.details.playerOrder || [];
+            const playerNames = state.currentRoom && state.currentRoom.playerNames ? state.currentRoom.playerNames : {};
+            detailsHtml += '<table style="width:100%;margin-top:10px;border-collapse:collapse;font-size:0.95em">';
+            detailsHtml += '<tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Team</th><th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">Game Points</th></tr>';
+            for (const [team, pts] of Object.entries(gp)) {
+                const members = team === 'A' ? [playerOrder[0], playerOrder[2]] : [playerOrder[1], playerOrder[3]];
+                const names = members.filter(Boolean).map(id => escapeHtml(playerNames[id] || id)).join(' & ');
+                detailsHtml += `<tr><td style="padding:4px 8px">Team ${team}: ${names}</td><td style="text-align:right;padding:4px 8px;font-weight:700">${pts}</td></tr>`;
+            }
+            detailsHtml += '</table>';
+        } else if (gameType === 'CALL_BRIDGE' && gameState.details && gameState.details.totalScores) {
             const scores = gameState.details.totalScores;
             const playerNames = state.currentRoom && state.currentRoom.playerNames ? state.currentRoom.playerNames : {};
             const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
