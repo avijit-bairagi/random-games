@@ -47,11 +47,26 @@ public class RoomController {
         public void setAsSpectator(boolean asSpectator) { this.asSpectator = asSpectator; }
     }
 
+    public static class JoinByCodeRequest {
+        private String secretCode;
+        private String playerId;
+        private boolean asSpectator;
+
+        public JoinByCodeRequest() {}
+
+        public String getSecretCode() { return secretCode; }
+        public void setSecretCode(String secretCode) { this.secretCode = secretCode; }
+        public String getPlayerId() { return playerId; }
+        public void setPlayerId(String playerId) { this.playerId = playerId; }
+        public boolean isAsSpectator() { return asSpectator; }
+        public void setAsSpectator(boolean asSpectator) { this.asSpectator = asSpectator; }
+    }
+
     @PostMapping("/rooms")
     @Operation(summary = "Create a new game room")
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest request) {
         GameRoom room = roomService.createRoom(request);
-        return ResponseEntity.ok(RoomResponse.from(room));
+        return ResponseEntity.ok(RoomResponse.from(room, room.isPrivateRoom()));
     }
 
     @PostMapping("/{gameType}/rooms")
@@ -60,7 +75,7 @@ public class RoomController {
                                                           @Valid @RequestBody CreateRoomRequest request) {
         request.setGameType(gameType);
         GameRoom room = roomService.createRoom(request);
-        return ResponseEntity.ok(RoomResponse.from(room));
+        return ResponseEntity.ok(RoomResponse.from(room, room.isPrivateRoom()));
     }
 
     @GetMapping("/rooms")
@@ -93,6 +108,13 @@ public class RoomController {
     public ResponseEntity<RoomResponse> joinRoom(@PathVariable String roomId,
                                                  @RequestBody JoinRoomRequest request) {
         GameRoom room = roomService.joinRoom(roomId, request.getPlayerId(), request.isAsSpectator());
+        return ResponseEntity.ok(RoomResponse.from(room));
+    }
+
+    @PostMapping("/rooms/join-by-code")
+    @Operation(summary = "Join a private game room using a secret code")
+    public ResponseEntity<RoomResponse> joinRoomByCode(@RequestBody JoinByCodeRequest request) {
+        GameRoom room = roomService.joinRoomByCode(request.getSecretCode(), request.getPlayerId(), request.isAsSpectator());
         return ResponseEntity.ok(RoomResponse.from(room));
     }
 

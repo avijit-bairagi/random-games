@@ -20,4 +20,5 @@ public final class ErrorCodes {
     public static final String INVALID_MESSAGE_FORMAT = "INVALID_MESSAGE_FORMAT";
     public static final String RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    public static final String INVALID_SECRET_CODE = "INVALID_SECRET_CODE";
 }

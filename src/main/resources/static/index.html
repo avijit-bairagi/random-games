@@ -118,6 +118,7 @@
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
+                        <button id="openJoinByCodeModalBtn" class="btn btn-secondary">🔑 Join by Code</button>
                         <button id="openCreateRoomModalBtn" class="btn btn-primary">+ Create Room</button>
                     </div>
                 </div>
@@ -176,6 +177,14 @@
                             <h3>Game Details</h3>
                             <div id="gameStatusDetails" class="game-details-box">
                                 Waiting for players to join...
+                            </div>
+                        </div>
+
+                        <div class="sidebar-card" id="secretCodeCard" style="display:none;">
+                            <h3>🔒 Room Code</h3>
+                            <div style="text-align:center;padding:8px 0;">
+                                <div id="secretCodeDisplay" style="font-size:1.6rem;font-weight:800;letter-spacing:0.2em;color:var(--accent,#6366f1);font-family:monospace;"></div>
+                                <button id="copySecretCodeBtn" class="btn btn-secondary" style="margin-top:8px;font-size:0.8rem;padding:4px 14px;">📋 Copy Code</button>
                             </div>
                         </div>
 
@@ -607,10 +616,38 @@
                         <input type="checkbox" id="allowSpectatorsCheckbox" checked>
                         <label for="allowSpectatorsCheckbox">Allow Spectators to watch the game</label>
                     </div>
+                    <div class="input-group-inline custom-checkbox-group">
+                        <input type="checkbox" id="privateRoomCheckbox">
+                        <label for="privateRoomCheckbox">🔒 Private Room (invite only via secret code)</label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" id="cancelCreateRoomBtn">Cancel</button>
                     <button class="btn btn-primary btn-glow" id="confirmCreateRoomBtn">✨ Create Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Join by Code Modal -->
+        <div id="joinByCodeModal" class="modal-backdrop" style="display: none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <span class="modal-title-icon">🔑</span>
+                        <h3>Join Private Room</h3>
+                    </div>
+                    <span class="modal-close" id="closeJoinByCodeModalBtn">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label for="secretCodeInput">Secret Room Code</label>
+                        <input type="text" id="secretCodeInput" placeholder="Enter room code" maxlength="8" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.15em;font-family:monospace;font-size:1.1rem;">
+                    </div>
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.5rem;">Ask the room creator to share their secret code with you.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelJoinByCodeBtn">Cancel</button>
+                    <button class="btn btn-primary btn-glow" id="confirmJoinByCodeBtn">🔑 Join Room</button>
                 </div>
             </div>
         </div>

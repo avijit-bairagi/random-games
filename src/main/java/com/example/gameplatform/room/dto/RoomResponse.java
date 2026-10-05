@@ -19,6 +19,8 @@ public class RoomResponse {
     private int spectatorCount;
     private boolean spectatorAllowed;
     private boolean lateJoinAllowed;
+    private boolean privateRoom;
+    private String secretCode;
     private RoomStatus status;
     private Instant createdAt;
     private Instant startedAt;
@@ -33,6 +35,7 @@ public class RoomResponse {
 
     public RoomResponse(String roomId, String name, String gameType, String hostPlayerId, String hostUsername, int minPlayers,
                         int maxPlayers, int currentPlayersCount, int spectatorCount, boolean spectatorAllowed, boolean lateJoinAllowed,
+                        boolean privateRoom, String secretCode,
                         RoomStatus status, Instant createdAt, Instant startedAt, List<String> playerIds,
                         List<String> spectatorIds, Map<String, String> playerNames, Map<String, String> spectatorNames,
                         Map<String, Object> configuration, Object gameStateSummary) {
@@ -47,6 +50,8 @@ public class RoomResponse {
         this.spectatorCount = spectatorCount;
         this.spectatorAllowed = spectatorAllowed;
         this.lateJoinAllowed = lateJoinAllowed;
+        this.privateRoom = privateRoom;
+        this.secretCode = secretCode;
         this.status = status;
         this.createdAt = createdAt;
         this.startedAt = startedAt;
@@ -59,6 +64,10 @@ public class RoomResponse {
     }
 
     public static RoomResponse from(GameRoom room) {
+        return from(room, true);
+    }
+
+    public static RoomResponse from(GameRoom room, boolean includeSecretCode) {
         String hostName = room.getPlayerUsernames().getOrDefault(room.getHostPlayerId(), room.getHostPlayerId());
         return builder()
                 .roomId(room.getRoomId())
@@ -72,6 +81,8 @@ public class RoomResponse {
                 .spectatorCount(room.getSpectatorIds().size())
                 .spectatorAllowed(room.isSpectatorAllowed())
                 .lateJoinAllowed(room.isLateJoinAllowed())
+                .privateRoom(room.isPrivateRoom())
+                .secretCode(includeSecretCode ? room.getSecretCode() : null)
                 .status(room.getStatus())
                 .createdAt(room.getCreatedAt())
                 .startedAt(room.getStartedAt())
@@ -100,6 +111,8 @@ public class RoomResponse {
         private int spectatorCount;
         private boolean spectatorAllowed;
         private boolean lateJoinAllowed;
+        private boolean privateRoom;
+        private String secretCode;
         private RoomStatus status;
         private Instant createdAt;
         private Instant startedAt;
@@ -121,6 +134,8 @@ public class RoomResponse {
         public Builder spectatorCount(int spectatorCount) { this.spectatorCount = spectatorCount; return this; }
         public Builder spectatorAllowed(boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; return this; }
         public Builder lateJoinAllowed(boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; return this; }
+        public Builder privateRoom(boolean privateRoom) { this.privateRoom = privateRoom; return this; }
+        public Builder secretCode(String secretCode) { this.secretCode = secretCode; return this; }
         public Builder status(RoomStatus status) { this.status = status; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Builder startedAt(Instant startedAt) { this.startedAt = startedAt; return this; }
@@ -133,7 +148,8 @@ public class RoomResponse {
 
         public RoomResponse build() {
             return new RoomResponse(roomId, name, gameType, hostPlayerId, hostUsername, minPlayers, maxPlayers,
-                    currentPlayersCount, spectatorCount, spectatorAllowed, lateJoinAllowed, status, createdAt, startedAt,
+                    currentPlayersCount, spectatorCount, spectatorAllowed, lateJoinAllowed, privateRoom, secretCode,
+                    status, createdAt, startedAt,
                     playerIds, spectatorIds, playerNames, spectatorNames, configuration, gameStateSummary);
         }
     }
@@ -160,6 +176,10 @@ public class RoomResponse {
     public void setSpectatorAllowed(boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; }
     public boolean isLateJoinAllowed() { return lateJoinAllowed; }
     public void setLateJoinAllowed(boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; }
+    public boolean isPrivateRoom() { return privateRoom; }
+    public void setPrivateRoom(boolean privateRoom) { this.privateRoom = privateRoom; }
+    public String getSecretCode() { return secretCode; }
+    public void setSecretCode(String secretCode) { this.secretCode = secretCode; }
     public RoomStatus getStatus() { return status; }
     public void setStatus(RoomStatus status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
