@@ -1,0 +1,471 @@
+/*
+ * Responsive Styles — Mobile, Tablet, Desktop
+ *
+ * Breakpoints (standard):
+ *   Mobile  : max-width: 480px
+ *   Tablet  : max-width: 768px
+ *   Desktop : max-width: 1024px  (wide-desktop adjustments)
+ *
+ * This file is loaded last and overrides layout rules for smaller screens.
+ * No backend logic is touched.
+ */
+
+/* ============================================================
+   DESKTOP / LARGE TABLET  (≤ 1024px)
+   ============================================================ */
+@media (max-width: 1024px) {
+    .content-container {
+        padding: 1.5rem;
+    }
+
+    /* Shrink fixed sidebar so the board still has room */
+    .game-layout {
+        grid-template-columns: 260px 1fr;
+        gap: 1rem;
+    }
+
+    /* Room grid: 2 columns instead of auto-fill */
+    .room-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Chess: allow info panel to wrap earlier */
+    .chess-layout {
+        gap: 0.75rem;
+    }
+}
+
+/* ============================================================
+   TABLET  (≤ 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+    /* --- Navbar --- */
+    .navbar {
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .logo {
+        font-size: 1.1rem;
+    }
+
+    .user-info {
+        gap: 0.75rem;
+    }
+
+    /* --- Content --- */
+    .content-container {
+        padding: 1rem;
+    }
+
+    /* --- Welcome card --- */
+    .card {
+        padding: 1.75rem 1.25rem;
+    }
+
+    .welcome-title {
+        font-size: 1.65rem;
+    }
+
+    /* Games showcase: 2 columns on tablet */
+    .welcome-games-showcase {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* --- Lobby --- */
+    .lobby-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Tabs: scrollable row instead of wrapping */
+    .game-tabs {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        padding-bottom: 0.25rem;
+    }
+
+    .tab-btn {
+        white-space: nowrap;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .lobby-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    /* Room grid: single column */
+    .room-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* --- Game Room --- */
+    .room-topbar {
+        padding: 0.75rem 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .room-meta {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    /* Sidebar stacks below board */
+    .game-layout {
+        grid-template-columns: 1fr;
+    }
+
+    /* Sidebar order: board first, sidebar second */
+    .game-sidebar {
+        order: 2;
+    }
+
+    .game-board-area {
+        order: 1;
+        padding: 1rem;
+        min-height: unset;
+    }
+
+    /* --- Tic-Tac-Toe --- */
+    .ttt-grid {
+        grid-template-columns: repeat(3, 80px);
+        grid-template-rows: repeat(3, 80px);
+    }
+
+    .ttt-cell {
+        font-size: 2.25rem;
+    }
+
+    /* --- Ludo / Snake canvas --- */
+    .ludo-canvas-wrapper canvas,
+    .snake-canvas-wrapper canvas {
+        width: 100% !important;
+        height: auto !important;
+        max-width: 520px;
+    }
+
+    /* --- Chess --- */
+    .chess-layout {
+        flex-direction: column;
+    }
+
+    .chess-info-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        max-width: 100%;
+    }
+
+    /* --- Call Bridge table --- */
+    .cb-table {
+        gap: 0.5rem;
+    }
+
+    .cb-player-pod {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    .cb-pod-stats {
+        flex-direction: column;
+        gap: 0.1rem;
+    }
+
+    /* --- Twenty-Nine table --- */
+    .tn-table {
+        gap: 0.5rem;
+    }
+
+    .tn-player-pod {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    /* --- Toast --- */
+    .toast {
+        bottom: 1rem;
+        left: 1rem;
+        right: 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* --- Modal footer buttons stack --- */
+    .modal-footer {
+        flex-wrap: wrap;
+    }
+
+    .game-over-footer {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* ============================================================
+   MOBILE  (≤ 480px)
+   ============================================================ */
+@media (max-width: 480px) {
+    /* --- Navbar --- */
+    .navbar {
+        padding: 0.6rem 0.75rem;
+    }
+
+    .logo-text .badge {
+        display: none; /* save space on very small screens */
+    }
+
+    /* --- Content --- */
+    .content-container {
+        padding: 0.75rem;
+    }
+
+    /* --- Welcome card --- */
+    .card {
+        padding: 1.25rem 1rem;
+        border-radius: 10px;
+    }
+
+    .welcome-title {
+        font-size: 1.35rem;
+    }
+
+    .subtitle {
+        font-size: 0.88rem;
+    }
+
+    /* Games showcase: single column */
+    .welcome-games-showcase {
+        grid-template-columns: 1fr;
+        gap: 0.6rem;
+    }
+
+    .welcome-game-chip {
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 0.65rem 0.85rem;
+        gap: 0.75rem;
+    }
+
+    .game-chip-details {
+        align-items: flex-start;
+    }
+
+    /* Enter button full-width */
+    #enterPlatformBtn {
+        width: 100%;
+    }
+
+    /* --- Lobby --- */
+    .tab-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.78rem;
+    }
+
+    .lobby-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .lobby-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* --- Game Room topbar --- */
+    .room-topbar {
+        padding: 0.6rem 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .room-meta {
+        gap: 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    #roomTitle {
+        font-size: 1rem;
+    }
+
+    .room-controls {
+        width: 100%;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .room-controls .btn {
+        flex: 1;
+    }
+
+    /* --- Game board area --- */
+    .game-board-area {
+        padding: 0.75rem;
+        border-radius: 10px;
+    }
+
+    /* --- Tic-Tac-Toe --- */
+    .ttt-grid {
+        grid-template-columns: repeat(3, 28vw);
+        grid-template-rows: repeat(3, 28vw);
+        gap: 6px;
+    }
+
+    .ttt-cell {
+        font-size: 1.75rem;
+        border-radius: 8px;
+    }
+
+    /* --- Turn indicator --- */
+    .turn-indicator {
+        font-size: 0.95rem;
+        padding: 0.4rem 1rem;
+        text-align: center;
+    }
+
+    /* --- Ludo / Snake canvas --- */
+    .ludo-canvas-wrapper canvas,
+    .snake-canvas-wrapper canvas {
+        max-width: 100%;
+    }
+
+    /* Dice button full-width */
+    .dice-roll-container {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    #ludoRollDiceBtn,
+    #snakeRollDiceBtn {
+        width: 100%;
+    }
+
+    /* --- Chess --- */
+    .chess-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+
+    /* --- Call Bridge --- */
+    .cb-header-bar {
+        flex-direction: column;
+        gap: 0.4rem;
+        align-items: flex-start;
+    }
+
+    .cb-bidding-buttons {
+        gap: 0.35rem;
+    }
+
+    .cb-bid-btn {
+        min-width: 36px;
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    /* Hand cards: tighter overlap */
+    .cb-hand-container,
+    .tn-hand-container {
+        padding: 0.5rem 0.25rem;
+    }
+
+    /* --- Twenty-Nine --- */
+    .tn-header-bar {
+        flex-direction: column;
+        gap: 0.4rem;
+        align-items: flex-start;
+    }
+
+    .tn-bidding-buttons {
+        gap: 0.35rem;
+    }
+
+    .tn-trump-buttons {
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .tn-trump-btn {
+        flex: 1 1 calc(50% - 0.4rem);
+    }
+
+    /* Scoreboard tables: allow horizontal scroll */
+    .cb-scoreboard-box,
+    .tn-scoreboard-box {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- Sidebar cards --- */
+    .sidebar-card {
+        padding: 0.85rem;
+    }
+
+    .events-log {
+        height: 120px;
+    }
+
+    /* --- Modals --- */
+    .modal-card {
+        padding: 1rem;
+        width: 95%;
+        border-radius: 10px;
+    }
+
+    .modal-header h3 {
+        font-size: 1.05rem;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .game-over-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .game-over-footer .btn {
+        width: 100%;
+    }
+
+    .game-over-winner {
+        font-size: 1.25rem;
+    }
+
+    /* --- Toast --- */
+    .toast {
+        bottom: 0.75rem;
+        left: 0.5rem;
+        right: 0.5rem;
+        font-size: 0.85rem;
+        padding: 0.6rem 1rem;
+    }
+
+    /* --- Snake theme pills --- */
+    .board-theme-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+
+    .theme-pills {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .theme-pill {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.5rem;
+    }
+}
