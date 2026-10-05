@@ -326,7 +326,13 @@ async function renderLudo(gameState, events) {
         const rollerState = details.playerStates ? details.playerStates[diceEvt.playerId] : null;
         const rollerColor = rollerState ? rollerState.color : 'Player';
         const rollerName = details.players && details.players[diceEvt.playerId] ? details.players[diceEvt.playerId].username : `${rollerColor}`;
+        
+        // Disable UI during dice animation
+        isLudoAnimating = true;
+        updateLudoUI(gameState);
+
         triggerDiceRollAnimation('LUDO', `${rollerName} (${rollerColor})`, diceEvt.payload.dice, () => {
+            isLudoAnimating = false;
             syncLudoTokenPositions(details);
             drawLudoBoard(details);
             updateLudoUI(gameState);

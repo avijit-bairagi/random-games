@@ -355,6 +355,13 @@ async function renderSnake(gameState, events) {
     let snakeEvt = null;
     let rollVal = details.lastDiceRoll || 0;
 
+    // Identify who rolled the dice from events
+    const diceEvt = events && events.find(e => e.eventType === 'DICE_ROLLED');
+    if (diceEvt) {
+        movedPid = diceEvt.playerId;
+        rollVal = diceEvt.payload.dice;
+    }
+
     if (events && events.length > 0) {
         ladderEvt = events.find(e => e.eventType === 'LADDER_CLIMBED');
         snakeEvt = events.find(e => e.eventType === 'SNAKE_BITTEN');
@@ -379,6 +386,12 @@ async function renderSnake(gameState, events) {
         }
     }
 
+    // Set oldPos and finalPos if we only have movedPid from DICE_ROLLED
+    if (movedPid && players[movedPid] && oldPos === 0 && finalPos === 0) {
+        oldPos = snakeTokenPositions[movedPid] ? snakeTokenPositions[movedPid].currentPos : players[movedPid].position;
+        finalPos = players[movedPid].position;
+    }
+
     if (!movedPid || (oldPos === finalPos && rollVal === 0)) {
         // No animation needed
         Object.values(players).forEach(p => {
@@ -392,7 +405,8 @@ async function renderSnake(gameState, events) {
 
     // Animate the turn!
     isSnakeAnimating = true;
-    el.snakeRollDiceBtn.disabled = true;
+    if (el.snakeRollDiceBtn) el.snakeRollDiceBtn.disabled = true;
+    updateSnakeUI(gameState);
 
     const movingPlayer = players[movedPid];
     const rollerName = movingPlayer ? movingPlayer.username : 'Player';
@@ -411,6 +425,8 @@ async function renderSnake(gameState, events) {
     } else if (details.ladders && details.ladders[oldPos + rollVal]) {
         forwardTarget = oldPos + rollVal;
     } else if (details.snakes && details.snakes[oldPos + rollVal]) {
+        forwardTarget = oldPos + rollVal;
+    } else if (oldPos + rollVal <= 100) {
         forwardTarget = oldPos + rollVal;
     }
 
@@ -446,11 +462,16 @@ async function renderSnake(gameState, events) {
     if (ladderEvt || (details.ladders && details.ladders[forwardTarget])) {
         const ladderStart = forwardTarget;
         const ladderEnd = ladderEvt ? ladderEvt.payload.to : details.ladders[forwardTarget];
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 600)); // Increased wait before big move
         const pStart = getSnakeLudoPosition(ladderStart);
         const pEnd = getSnakeLudoPosition(ladderEnd);
+        
+        // Dynamic duration based on distance
+        const dist = Math.sqrt(Math.pow(pEnd.x - pStart.x, 2) + Math.pow(pEnd.y - pStart.y, 2));
+        const duration = Math.max(1200, dist * 3); // Slower for big moves
+
         await new Promise(resolve => {
-            runAnimation(850, (t) => {
+            runAnimation(duration, (t) => {
                 const x = pStart.x + (pEnd.x - pStart.x) * t;
                 const y = pStart.y + (pEnd.y - pStart.y) * t;
                 snakeTokenPositions[movedPid] = { x, y, currentPos: ladderEnd };
@@ -460,10 +481,15 @@ async function renderSnake(gameState, events) {
     } else if (snakeEvt || (details.snakes && details.snakes[forwardTarget])) {
         const snakeHead = forwardTarget;
         const snakeTail = snakeEvt ? snakeEvt.payload.to : details.snakes[forwardTarget];
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 600)); // Increased wait before big move
         const { pHead, cp1, cp2, pTail } = getSnakeControlPoints(snakeHead, snakeTail);
+
+        // Dynamic duration based on distance
+        const dist = Math.sqrt(Math.pow(pHead.x - pTail.x, 2) + Math.pow(pHead.y - pTail.y, 2));
+        const duration = Math.max(1400, dist * 3.5); // Even slower for snakes
+
         await new Promise(resolve => {
-            runAnimation(950, (t) => {
+            runAnimation(duration, (t) => {
                 const pt = getSnakeBezierPoint(t, pHead, cp1, cp2, pTail);
                 snakeTokenPositions[movedPid] = { x: pt.x, y: pt.y, currentPos: snakeTail };
                 drawSnakeLudoBoard(details);

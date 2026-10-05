@@ -920,6 +920,8 @@ function updateGameState(gameState, events) {
         }
         if (type === 'CALL_BRIDGE' || type === 'TWENTY_NINE') {
             setTimeout(() => showGameOverModal(gameState, type), 3000);
+        } else if (type === 'SNAKE' || type === 'LUDO') {
+            setTimeout(() => showGameOverModal(gameState, type), 3500); // Wait for dice/move animation
         } else {
             showGameOverModal(gameState, type);
         }
@@ -1046,6 +1048,34 @@ function showGameOverModal(gameState, gameType) {
                 const isWin = winnerIds.includes(pid);
                 detailsHtml += `<tr><td style="padding:4px 8px">${isWin ? '🏆 ' : ''}${name}</td><td style="text-align:right;padding:4px 8px;font-weight:${isWin ? '700' : '400'};color:${isWin ? 'var(--accent)' : 'inherit'}">${score}</td></tr>`;
             }
+            detailsHtml += '</table>';
+        } else if (gameType === 'SNAKE' || gameType === 'LUDO') {
+            const players = (gameState.details && gameState.details.players) || (gameState.details && gameState.details.playerStates) || {};
+            const playerList = Object.values(players);
+            
+            // Sort by rank if available, otherwise by position (higher is better)
+            playerList.sort((a, b) => {
+                if (a.rank > 0 && b.rank > 0) return a.rank - b.rank;
+                if (a.rank > 0) return -1;
+                if (b.rank > 0) return 1;
+                return (b.position || 0) - (a.position || 0);
+            });
+
+            detailsHtml += '<table style="width:100%;margin-top:10px;border-collapse:collapse;font-size:0.95em">';
+            detailsHtml += '<tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Rank</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--border)">Player</th><th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--border)">Square</th></tr>';
+            
+            playerList.forEach((p, idx) => {
+                const name = escapeHtml(p.username || p.playerId);
+                const isMe = state.player && (p.playerId === state.player.id);
+                const rank = p.rank > 0 ? p.rank : (idx + 1);
+                const isWin = rank === 1;
+                
+                detailsHtml += `<tr>
+                    <td style="padding:4px 8px">${isWin ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : rank))}</td>
+                    <td style="padding:4px 8px">${isMe ? '<strong>' : ''}${name}${isMe ? ' (You)</strong>' : ''}</td>
+                    <td style="text-align:right;padding:4px 8px">${p.position || 0}</td>
+                </tr>`;
+            });
             detailsHtml += '</table>';
         }
         el.gameOverDetails.innerHTML = detailsHtml;
