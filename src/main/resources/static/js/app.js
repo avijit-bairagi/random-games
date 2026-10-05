@@ -30,6 +30,7 @@ const el = {
     wsStatusText: document.getElementById('wsStatusText'),
     playerBadge: document.getElementById('playerBadge'),
     displayUsername: document.getElementById('displayUsername'),
+    logoutBtn: document.getElementById('logoutBtn'),
     
     welcomeScreen: document.getElementById('welcomeScreen'),
     lobbyScreen: document.getElementById('lobbyScreen'),
@@ -166,6 +167,7 @@ function setupEventListeners() {
     el.gameTypeSelect.addEventListener('change', updateMaxPlayersOptions);
 
     el.leaveRoomBtn.addEventListener('click', handleLeaveRoom);
+    if (el.logoutBtn) el.logoutBtn.addEventListener('click', handleLogout);
     el.startGameBtn.addEventListener('click', handleStartGame);
     el.restartGameBtn.addEventListener('click', handleRestartGame);
 
@@ -767,6 +769,37 @@ function handleRestartGame() {
     state.chessSelectedSquare = null;
     state.chessValidMoves = [];
     sendWsMessage('RESTART_GAME');
+}
+
+function handleLogout() {
+    // Leave active room first if in one
+    if (state.currentRoom) {
+        sendWsMessage('LEAVE_ROOM');
+        localStorage.removeItem('game_platform_room_id');
+        localStorage.removeItem('game_platform_as_spectator');
+        state.currentRoom = null;
+        state.isSpectator = false;
+    }
+
+    // Close WebSocket
+    if (state.pingInterval) { clearInterval(state.pingInterval); state.pingInterval = null; }
+    if (state.ws) { try { state.ws.onclose = null; state.ws.close(); } catch(e) {} state.ws = null; }
+
+    // Clear player session
+    localStorage.removeItem('game_platform_player');
+    state.player = null;
+    state.wsConnected = false;
+    state.currentGameState = null;
+    state.rooms = [];
+
+    // Reset navbar
+    el.playerBadge.style.display = 'none';
+    el.displayUsername.textContent = 'Guest';
+    el.wsStatusIndicator.className = 'connection-status';
+    el.wsStatusText.textContent = 'Disconnected';
+
+    showScreen('welcomeScreen');
+    showToast('You have been logged out', 'info');
 }
 
 function handleLeaveRoom() {
