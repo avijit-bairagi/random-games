@@ -93,6 +93,9 @@ public class RoomService {
             }
         }
 
+        boolean isPrivate = Boolean.TRUE.equals(request.getPrivateRoom());
+        String secretCode = isPrivate ? generateSecretCode() : null;
+
         GameRoom room = GameRoom.builder()
                 .roomId(roomId)
                 .name(request.getName())
@@ -102,6 +105,8 @@ public class RoomService {
                 .maxPlayers(maxPlayers)
                 .spectatorAllowed(request.getSpectatorAllowed() != null ? request.getSpectatorAllowed() : engine.isSpectatorAllowed())
                 .lateJoinAllowed(request.getLateJoinAllowed() != null ? request.getLateJoinAllowed() : engine.isLateJoinAllowed())
+                .privateRoom(isPrivate)
+                .secretCode(secretCode)
                 .status(RoomStatus.WAITING)
                 .createdAt(Instant.now())
                 .build();
@@ -626,6 +631,24 @@ public class RoomService {
     @PreDestroy
     public void cleanup() {
         disconnectScheduler.shutdown();
+    }
+
+    public GameRoom joinRoomByCode(String secretCode, String playerId, boolean asSpectator) {
+        GameRoom room = roomRepository.findBySecretCode(secretCode)
+                .orElseThrow(() -> new GamePlatformException(ErrorCodes.INVALID_SECRET_CODE, "Invalid or expired room code"));
+
+        if (room.getStatus() == RoomStatus.IN_PROGRESS && !room.isLateJoinAllowed()) {
+            throw new GamePlatformException(ErrorCodes.GAME_ALREADY_STARTED, "Game already started. Late join not allowed");
+        }
+        if (room.getStatus() == RoomStatus.CANCELLED) {
+            throw new GamePlatformException(ErrorCodes.INVALID_SECRET_CODE, "Room is no longer available");
+        }
+
+        return joinRoom(room.getRoomId(), playerId, asSpectator);
+    }
+
+    private String generateSecretCode() {
+        return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     public List<GameRoom> getAvailableRooms(String gameType) {

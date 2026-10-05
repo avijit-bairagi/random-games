@@ -47,7 +47,14 @@ public class RoomRepository {
         return rooms.values().stream()
                 .filter(r -> (gameType == null || r.getGameType().equalsIgnoreCase(gameType)))
                 .filter(r -> r.getStatus() != RoomStatus.CANCELLED)
+                .filter(r -> !r.isPrivateRoom())
                 .collect(Collectors.toList());
+    }
+
+    public Optional<GameRoom> findBySecretCode(String secretCode) {
+        return rooms.values().stream()
+                .filter(r -> secretCode != null && secretCode.equals(r.getSecretCode()))
+                .findFirst();
     }
 
     public Optional<GameRoom> findByPlayerId(String playerId) {

@@ -54,6 +54,18 @@ const el = {
     gameTypeSelect: document.getElementById('gameTypeSelect'),
     maxPlayersInput: document.getElementById('maxPlayersInput'),
     allowSpectatorsCheckbox: document.getElementById('allowSpectatorsCheckbox'),
+    privateRoomCheckbox: document.getElementById('privateRoomCheckbox'),
+
+    joinByCodeModal: document.getElementById('joinByCodeModal'),
+    closeJoinByCodeModalBtn: document.getElementById('closeJoinByCodeModalBtn'),
+    cancelJoinByCodeBtn: document.getElementById('cancelJoinByCodeBtn'),
+    confirmJoinByCodeBtn: document.getElementById('confirmJoinByCodeBtn'),
+    secretCodeInput: document.getElementById('secretCodeInput'),
+    openJoinByCodeModalBtn: document.getElementById('openJoinByCodeModalBtn'),
+
+    secretCodeCard: document.getElementById('secretCodeCard'),
+    secretCodeDisplay: document.getElementById('secretCodeDisplay'),
+    copySecretCodeBtn: document.getElementById('copySecretCodeBtn'),
     
     roomTitle: document.getElementById('roomTitle'),
     roomGameType: document.getElementById('roomGameType'),
@@ -163,6 +175,18 @@ function setupEventListeners() {
     el.closeCreateRoomModalBtn.addEventListener('click', closeCreateRoomModal);
     el.cancelCreateRoomBtn.addEventListener('click', closeCreateRoomModal);
     el.confirmCreateRoomBtn.addEventListener('click', handleCreateRoom);
+
+    if (el.openJoinByCodeModalBtn) el.openJoinByCodeModalBtn.addEventListener('click', openJoinByCodeModal);
+    if (el.closeJoinByCodeModalBtn) el.closeJoinByCodeModalBtn.addEventListener('click', closeJoinByCodeModal);
+    if (el.cancelJoinByCodeBtn) el.cancelJoinByCodeBtn.addEventListener('click', closeJoinByCodeModal);
+    if (el.confirmJoinByCodeBtn) el.confirmJoinByCodeBtn.addEventListener('click', handleJoinByCode);
+    if (el.secretCodeInput) el.secretCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleJoinByCode(); });
+
+    if (el.copySecretCodeBtn) el.copySecretCodeBtn.addEventListener('click', () => {
+        const code = el.secretCodeDisplay ? el.secretCodeDisplay.textContent : '';
+        if (!code) return;
+        copyToClipboard(code);
+    });
 
     el.gameTypeSelect.addEventListener('change', updateMaxPlayersOptions);
 
@@ -346,6 +370,7 @@ async function handleCreateRoom() {
     const gameType = el.gameTypeSelect.value;
     const maxPlayers = parseInt(el.maxPlayersInput.value);
     const spectatorAllowed = el.allowSpectatorsCheckbox.checked;
+    const privateRoom = el.privateRoomCheckbox ? el.privateRoomCheckbox.checked : false;
 
     let configuration = null;
     if (gameType === 'CALL_BRIDGE') {
@@ -369,6 +394,7 @@ async function handleCreateRoom() {
                 maxPlayers,
                 spectatorAllowed,
                 lateJoinAllowed: false,
+                privateRoom,
                 configuration
             })
         });
@@ -376,6 +402,10 @@ async function handleCreateRoom() {
         if (res.ok) {
             const room = await res.json();
             closeCreateRoomModal();
+            if (room.privateRoom && room.secretCode) {
+                showToast(`🔒 Private room created! Secret code: ${room.secretCode}`, 'info');
+                showSecretCodeBanner(room.secretCode);
+            }
             enterRoom(room);
         } else {
             const err = await res.json();
@@ -384,6 +414,70 @@ async function handleCreateRoom() {
     } catch (err) {
         showToast('Error creating room: ' + err.message, 'error');
     }
+}
+
+function openJoinByCodeModal() {
+    if (el.joinByCodeModal) {
+        if (el.secretCodeInput) el.secretCodeInput.value = '';
+        el.joinByCodeModal.style.display = 'flex';
+    }
+}
+
+function closeJoinByCodeModal() {
+    if (el.joinByCodeModal) el.joinByCodeModal.style.display = 'none';
+}
+
+async function handleJoinByCode() {
+    if (!state.player) {
+        showToast('Please enter a username first', 'error');
+        return;
+    }
+    const secretCode = el.secretCodeInput ? el.secretCodeInput.value.trim().toUpperCase() : '';
+    if (!secretCode) {
+        showToast('Please enter a secret code', 'error');
+        return;
+    }
+    try {
+        const res = await fetch('/api/v1/games/rooms/join-by-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secretCode, playerId: state.player.id, asSpectator: false })
+        });
+        if (res.ok) {
+            const room = await res.json();
+            closeJoinByCodeModal();
+            enterRoom(room, false);
+        } else {
+            const err = await res.json();
+            showToast(err.message || 'Invalid or expired code', 'error');
+        }
+    } catch (err) {
+        showToast('Error joining room: ' + err.message, 'error');
+    }
+}
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('Code copied!', 'info')).catch(() => fallbackCopy(text));
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); showToast('Code copied!', 'info'); } catch(e) { showToast('Copy failed — please copy manually: ' + text, 'error'); }
+    document.body.removeChild(ta);
+}
+
+function showSecretCodeBanner(secretCode) {
+    // Secret code is now always visible in the sidebar; just show a toast
+    showToast(`🔒 Private room created! Code: ${secretCode}`, 'info');
 }
 
 async function joinRoom(roomId, asSpectator = false) {
@@ -711,6 +805,16 @@ function updateRoomState(room) {
     if (room && room.gameStateSummary) {
         state.currentGameState = room.gameStateSummary;
     }
+    // Show secret code card for private rooms (always visible to everyone in the room)
+    if (el.secretCodeCard && el.secretCodeDisplay) {
+        if (room.privateRoom && room.secretCode) {
+            el.secretCodeDisplay.textContent = room.secretCode;
+            el.secretCodeCard.style.display = 'block';
+        } else {
+            el.secretCodeCard.style.display = 'none';
+        }
+    }
+
     el.roomTitle.textContent = room.name;
     el.roomGameType.textContent = formatGameType(room.gameType);
     el.roomStatusPill.textContent = formatStatus(room.status);

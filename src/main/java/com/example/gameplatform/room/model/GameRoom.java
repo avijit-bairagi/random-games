@@ -19,6 +19,8 @@ public class GameRoom {
     private int maxPlayers;
     private boolean spectatorAllowed;
     private boolean lateJoinAllowed;
+    private boolean privateRoom;
+    private String secretCode;
     private RoomStatus status;
     private Instant createdAt;
     private Instant startedAt;
@@ -36,7 +38,8 @@ public class GameRoom {
     public GameRoom() {}
 
     public GameRoom(String roomId, String name, String gameType, String hostPlayerId, int minPlayers, int maxPlayers,
-                    boolean spectatorAllowed, boolean lateJoinAllowed, RoomStatus status, Instant createdAt,
+                    boolean spectatorAllowed, boolean lateJoinAllowed, boolean privateRoom, String secretCode,
+                    RoomStatus status, Instant createdAt,
                     Instant startedAt, Instant finishedAt, List<String> playerIds, List<String> spectatorIds,
                     Map<String, String> playerUsernames, Map<String, String> spectatorUsernames,
                     Map<String, Object> configuration, GameState<?> currentGameState) {
@@ -48,6 +51,8 @@ public class GameRoom {
         this.maxPlayers = maxPlayers;
         this.spectatorAllowed = spectatorAllowed;
         this.lateJoinAllowed = lateJoinAllowed;
+        this.privateRoom = privateRoom;
+        this.secretCode = secretCode;
         this.status = status;
         this.createdAt = createdAt;
         this.startedAt = startedAt;
@@ -73,6 +78,8 @@ public class GameRoom {
         private int maxPlayers;
         private boolean spectatorAllowed;
         private boolean lateJoinAllowed;
+        private boolean privateRoom;
+        private String secretCode;
         private RoomStatus status;
         private Instant createdAt;
         private Instant startedAt;
@@ -92,6 +99,8 @@ public class GameRoom {
         public Builder maxPlayers(int maxPlayers) { this.maxPlayers = maxPlayers; return this; }
         public Builder spectatorAllowed(boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; return this; }
         public Builder lateJoinAllowed(boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; return this; }
+        public Builder privateRoom(boolean privateRoom) { this.privateRoom = privateRoom; return this; }
+        public Builder secretCode(String secretCode) { this.secretCode = secretCode; return this; }
         public Builder status(RoomStatus status) { this.status = status; return this; }
         public Builder createdAt(Instant createdAt) { this.createdAt = createdAt; return this; }
         public Builder startedAt(Instant startedAt) { this.startedAt = startedAt; return this; }
@@ -105,7 +114,7 @@ public class GameRoom {
 
         public GameRoom build() {
             return new GameRoom(roomId, name, gameType, hostPlayerId, minPlayers, maxPlayers,
-                    spectatorAllowed, lateJoinAllowed, status, createdAt, startedAt, finishedAt,
+                    spectatorAllowed, lateJoinAllowed, privateRoom, secretCode, status, createdAt, startedAt, finishedAt,
                     playerIds, spectatorIds, playerUsernames, spectatorUsernames, configuration, currentGameState);
         }
     }
@@ -131,6 +140,10 @@ public class GameRoom {
     public void setSpectatorAllowed(boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; }
     public boolean isLateJoinAllowed() { return lateJoinAllowed; }
     public void setLateJoinAllowed(boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; }
+    public boolean isPrivateRoom() { return privateRoom; }
+    public void setPrivateRoom(boolean privateRoom) { this.privateRoom = privateRoom; }
+    public String getSecretCode() { return secretCode; }
+    public void setSecretCode(String secretCode) { this.secretCode = secretCode; }
     public RoomStatus getStatus() { return status; }
     public void setStatus(RoomStatus status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }

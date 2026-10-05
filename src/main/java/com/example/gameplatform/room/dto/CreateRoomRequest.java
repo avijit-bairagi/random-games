@@ -17,18 +17,21 @@ public class CreateRoomRequest {
     private Integer maxPlayers;
     private Boolean spectatorAllowed;
     private Boolean lateJoinAllowed;
+    private Boolean privateRoom;
     private Map<String, Object> configuration;
 
     public CreateRoomRequest() {}
 
     public CreateRoomRequest(String name, String gameType, String hostPlayerId, Integer maxPlayers,
-                             Boolean spectatorAllowed, Boolean lateJoinAllowed, Map<String, Object> configuration) {
+                             Boolean spectatorAllowed, Boolean lateJoinAllowed, Boolean privateRoom,
+                             Map<String, Object> configuration) {
         this.name = name;
         this.gameType = gameType;
         this.hostPlayerId = hostPlayerId;
         this.maxPlayers = maxPlayers;
         this.spectatorAllowed = spectatorAllowed;
         this.lateJoinAllowed = lateJoinAllowed;
+        this.privateRoom = privateRoom;
         this.configuration = configuration;
     }
 
@@ -43,6 +46,7 @@ public class CreateRoomRequest {
         private Integer maxPlayers;
         private Boolean spectatorAllowed;
         private Boolean lateJoinAllowed;
+        private Boolean privateRoom;
         private Map<String, Object> configuration;
 
         public Builder name(String name) { this.name = name; return this; }
@@ -51,9 +55,10 @@ public class CreateRoomRequest {
         public Builder maxPlayers(Integer maxPlayers) { this.maxPlayers = maxPlayers; return this; }
         public Builder spectatorAllowed(Boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; return this; }
         public Builder lateJoinAllowed(Boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; return this; }
+        public Builder privateRoom(Boolean privateRoom) { this.privateRoom = privateRoom; return this; }
         public Builder configuration(Map<String, Object> configuration) { this.configuration = configuration; return this; }
         public CreateRoomRequest build() {
-            return new CreateRoomRequest(name, gameType, hostPlayerId, maxPlayers, spectatorAllowed, lateJoinAllowed, configuration);
+            return new CreateRoomRequest(name, gameType, hostPlayerId, maxPlayers, spectatorAllowed, lateJoinAllowed, privateRoom, configuration);
         }
     }
 
@@ -69,6 +74,8 @@ public class CreateRoomRequest {
     public void setSpectatorAllowed(Boolean spectatorAllowed) { this.spectatorAllowed = spectatorAllowed; }
     public Boolean getLateJoinAllowed() { return lateJoinAllowed; }
     public void setLateJoinAllowed(Boolean lateJoinAllowed) { this.lateJoinAllowed = lateJoinAllowed; }
+    public Boolean getPrivateRoom() { return privateRoom; }
+    public void setPrivateRoom(Boolean privateRoom) { this.privateRoom = privateRoom; }
     public Map<String, Object> getConfiguration() { return configuration; }
     public void setConfiguration(Map<String, Object> configuration) { this.configuration = configuration; }
 }
