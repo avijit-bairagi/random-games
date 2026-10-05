@@ -719,3 +719,35 @@ input[type="text"]:focus, input[type="number"]:focus, select:focus {
     border: 1px solid var(--border);
 }
 
+/* ── Footer ── */
+.app-footer {
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--border);
+    padding: 1rem 2rem;
+    margin-top: auto;
+    flex-shrink: 0;
+}
+
+.footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.footer-brand {
+    color: var(--text-main);
+    font-size: 0.9rem;
+}
+
+.footer-sep {
+    color: var(--border);
+}
+
+.footer-tagline {
+    font-style: italic;
+}
+
