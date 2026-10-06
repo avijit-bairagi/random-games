@@ -607,6 +607,18 @@ function handleIncomingWsMessage(msg) {
             const reason = (msg.payload && msg.payload.message) || 'Room has been closed.';
             showToast(reason, 'info');
             logEvent(`🚪 ${reason}`, 'important');
+            stopRoomExpiryTimer();
+            localStorage.removeItem('game_platform_room_id');
+            state.currentRoom = null;
+            showScreen('lobbyScreen');
+            fetchRooms();
+            break;
+        }
+        case 'ROOM_EXPIRED': {
+            const expiredReason = (msg.payload && msg.payload.reason) || 'Room expired: not started in time.';
+            showToast('⏰ ' + expiredReason, 'warning');
+            logEvent(`⏰ ${expiredReason}`, 'important');
+            stopRoomExpiryTimer();
             localStorage.removeItem('game_platform_room_id');
             state.currentRoom = null;
             showScreen('lobbyScreen');
@@ -769,6 +781,48 @@ function updateGameDetailsBox(room, gameState) {
     }
 }
 
+// ======================== ROOM EXPIRY TIMER ======================== //
+
+const ROOM_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes, must match server
+let roomExpiryTimerInterval = null;
+
+function startRoomExpiryTimer(createdAt) {
+    stopRoomExpiryTimer();
+    const timerCard = document.getElementById('roomExpiryTimerCard');
+    const countdown = document.getElementById('roomExpiryCountdown');
+    if (!timerCard || !countdown) return;
+
+    const createdAtMs = new Date(createdAt).getTime();
+
+    function tick() {
+        const remaining = ROOM_EXPIRY_MS - (Date.now() - createdAtMs);
+        if (remaining <= 0) {
+            countdown.textContent = '0:00';
+            countdown.style.color = 'var(--danger, #ef4444)';
+            stopRoomExpiryTimer();
+            return;
+        }
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        countdown.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        // Turn red in last 60 seconds
+        countdown.style.color = remaining <= 60000 ? 'var(--danger, #ef4444)' : 'var(--warning, #f59e0b)';
+    }
+
+    timerCard.style.display = 'block';
+    tick();
+    roomExpiryTimerInterval = setInterval(tick, 1000);
+}
+
+function stopRoomExpiryTimer() {
+    if (roomExpiryTimerInterval) {
+        clearInterval(roomExpiryTimerInterval);
+        roomExpiryTimerInterval = null;
+    }
+    const timerCard = document.getElementById('roomExpiryTimerCard');
+    if (timerCard) timerCard.style.display = 'none';
+}
+
 // ======================== ROOM & GAME MANAGEMENT ======================== //
 // ======================== ROOM & GAME MANAGEMENT ======================== //
 
@@ -844,6 +898,13 @@ function updateRoomState(room) {
         el.restartGameBtn.style.display = 'none';
     }
 
+    // Show expiry countdown only while room is not yet started
+    if ((room.status === 'WAITING' || room.status === 'READY') && room.createdAt) {
+        startRoomExpiryTimer(room.createdAt);
+    } else {
+        stopRoomExpiryTimer();
+    }
+
     renderPlayersList(room.playerIds);
     renderSpectatorsList(room.spectatorIds);
     setupGameBoardView(room.gameType);
@@ -909,6 +970,7 @@ function handleLogout() {
 function handleLeaveRoom() {
     if (!state.currentRoom) return;
     sendWsMessage('LEAVE_ROOM');
+    stopRoomExpiryTimer();
     localStorage.removeItem('game_platform_room_id');
     localStorage.removeItem('game_platform_as_spectator');
     state.currentRoom = null;

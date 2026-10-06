@@ -66,4 +66,10 @@ public class RoomRepository {
     public int count() {
         return rooms.size();
     }
+
+    public long countActiveRooms() {
+        return rooms.values().stream()
+                .filter(r -> r.getStatus() != RoomStatus.CANCELLED && r.getStatus() != RoomStatus.FINISHED)
+                .count();
+    }
 }
