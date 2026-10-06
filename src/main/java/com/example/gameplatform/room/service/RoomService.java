@@ -50,13 +50,23 @@ public class RoomService {
     private final SessionManager sessionManager;
     private final PlatformMetrics metrics;
 
+    private static final int MAX_ACTIVE_ROOMS = 50;
+    private static final long ROOM_EXPIRY_MINUTES = 5;
+
     private final ScheduledExecutorService disconnectScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "disconnect-timeout-worker");
         t.setDaemon(true);
         return t;
     });
 
+    private final ScheduledExecutorService roomExpiryScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "room-expiry-worker");
+        t.setDaemon(true);
+        return t;
+    });
+
     private final Map<String, ScheduledFuture<?>> disconnectTasks = new ConcurrentHashMap<>();
+    private final Map<String, ScheduledFuture<?>> roomExpiryTasks = new ConcurrentHashMap<>();
 
     @Value("${game.platform.disconnect-timeout-seconds:30}")
     private long disconnectTimeoutSeconds;
@@ -79,6 +89,12 @@ public class RoomService {
                 .orElseThrow(() -> new GamePlatformException(ErrorCodes.GAME_NOT_FOUND, "Unsupported game type: " + gameType));
 
         Player host = playerService.getPlayer(request.getHostPlayerId());
+
+        long activeRooms = roomRepository.countActiveRooms();
+        if (activeRooms >= MAX_ACTIVE_ROOMS) {
+            throw new GamePlatformException(ErrorCodes.ROOM_LIMIT_EXCEEDED,
+                    "Room limit reached. Maximum " + MAX_ACTIVE_ROOMS + " active rooms allowed.");
+        }
 
         String roomId = "room-" + UUID.randomUUID().toString().substring(0, 8);
         int minPlayers = engine.minPlayers();
@@ -124,6 +140,7 @@ public class RoomService {
         roomRepository.save(room);
         sessionManager.subscribeRoom(roomId, host.getId());
         metrics.incrementGamesCreated();
+        scheduleRoomExpiry(room);
 
         log.info("Created room {} for game {} by host {}", roomId, gameType, host.getId());
         return room;
@@ -366,6 +383,7 @@ public class RoomService {
                 throw new GamePlatformException(ErrorCodes.NOT_ENOUGH_PLAYERS, ex.getMessage());
             }
 
+            cancelRoomExpiry(roomId);
             room.setCurrentGameState(gameState);
             room.setStatus(RoomStatus.IN_PROGRESS);
             room.setStartedAt(Instant.now());
@@ -418,6 +436,7 @@ public class RoomService {
                 throw new GamePlatformException(ErrorCodes.NOT_ENOUGH_PLAYERS, ex.getMessage());
             }
 
+            cancelRoomExpiry(roomId);
             room.setCurrentGameState(gameState);
             room.setStatus(RoomStatus.IN_PROGRESS);
             room.setStartedAt(Instant.now());
@@ -628,9 +647,43 @@ public class RoomService {
         sessionManager.sendToRoom(room.getRoomId(), msg);
     }
 
+    private void scheduleRoomExpiry(GameRoom room) {
+        String roomId = room.getRoomId();
+        ScheduledFuture<?> task = roomExpiryScheduler.schedule(() -> {
+            roomExpiryTasks.remove(roomId);
+            roomRepository.findById(roomId).ifPresent(r -> {
+                r.getRoomLock().lock();
+                try {
+                    if (r.getStatus() == RoomStatus.WAITING || r.getStatus() == RoomStatus.READY) {
+                        r.setStatus(RoomStatus.CANCELLED);
+                        roomRepository.deleteById(roomId);
+                        OutboundMessage expiredMsg = OutboundMessage.builder()
+                                .type(MessageTypes.ROOM_EXPIRED)
+                                .roomId(roomId)
+                                .payload(Map.of("reason", "Room expired: not started within " + ROOM_EXPIRY_MINUTES + " minutes"))
+                                .build();
+                        sessionManager.sendToRoom(roomId, expiredMsg);
+                        log.info("Room {} expired and removed (not started within {} minutes)", roomId, ROOM_EXPIRY_MINUTES);
+                    }
+                } finally {
+                    r.getRoomLock().unlock();
+                }
+            });
+        }, ROOM_EXPIRY_MINUTES, TimeUnit.MINUTES);
+        roomExpiryTasks.put(roomId, task);
+    }
+
+    private void cancelRoomExpiry(String roomId) {
+        ScheduledFuture<?> task = roomExpiryTasks.remove(roomId);
+        if (task != null) {
+            task.cancel(false);
+        }
+    }
+
     @PreDestroy
     public void cleanup() {
         disconnectScheduler.shutdown();
+        roomExpiryScheduler.shutdown();
     }
 
     public GameRoom joinRoomByCode(String secretCode, String playerId, boolean asSpectator) {

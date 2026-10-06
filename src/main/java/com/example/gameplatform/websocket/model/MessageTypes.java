@@ -25,4 +25,5 @@ public final class MessageTypes {
     public static final String GAME_CANCELLED = "GAME_CANCELLED";
     public static final String ROOM_CLOSED = "ROOM_CLOSED";
     public static final String ROOM_UPDATED = "ROOM_UPDATED";
+    public static final String ROOM_EXPIRED = "ROOM_EXPIRED";
 }
