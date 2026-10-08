@@ -130,6 +130,9 @@ const el = {
     // Twenty-Nine
     twentyNineBoardContainer: document.getElementById('twentyNineBoardContainer'),
 
+    // Carrom
+    carromBoardContainer: document.getElementById('carromBoardContainer'),
+
     // Game Over Modal
     gameOverModal: document.getElementById('gameOverModal'),
     gameOverIcon: document.getElementById('gameOverIcon'),
@@ -690,6 +693,7 @@ function formatGameType(gameType) {
         case 'CHESS': return 'Chess';
         case 'CALL_BRIDGE': return 'Call Bridge';
         case 'TWENTY_NINE': return 'Twenty-Nine (29)';
+        case 'CARROM': return 'Carrom';
         default: return gameType;
     }
 }
@@ -703,6 +707,7 @@ function getGameIcon(gameType) {
         case 'CHESS': return '♟️';
         case 'CALL_BRIDGE': return '♠️';
         case 'TWENTY_NINE': return '🃏';
+        case 'CARROM': return '🎯';
         default: return '🎮';
     }
 }
@@ -733,6 +738,8 @@ function updateGameDetailsBox(room, gameState) {
             gameDesc = 'Call Bridge match in progress. Bid your tricks, then play cards to win rounds.';
         } else if (room.gameType === 'TWENTY_NINE') {
             gameDesc = 'Twenty-Nine match in progress. Bid 15-28, select secret trump, and capture card points for your team.';
+        } else if (room.gameType === 'CARROM') {
+            gameDesc = 'Carrom match in progress. Position your striker, aim with the mouse, set power and strike to pocket pieces!';
         } else {
             gameDesc = 'Match in progress.';
         }
@@ -1043,6 +1050,7 @@ function setupGameBoardView(gameType) {
     el.chessBoardContainer.style.display = 'none';
     if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'none';
     if (el.twentyNineBoardContainer) el.twentyNineBoardContainer.style.display = 'none';
+    if (el.carromBoardContainer) el.carromBoardContainer.style.display = 'none';
 
     const isWaitingOrReady = state.currentRoom && (state.currentRoom.status === 'WAITING' || state.currentRoom.status === 'READY');
     const waitingText = (state.currentRoom && state.currentRoom.status === 'READY')
@@ -1092,6 +1100,14 @@ function setupGameBoardView(gameType) {
             tnTurnIndicator.textContent = waitingText;
             tnTurnIndicator.style.color = 'var(--text-muted)';
         }
+    } else if (gameType === 'CARROM') {
+        if (el.carromBoardContainer) el.carromBoardContainer.style.display = 'flex';
+        const carromTurnIndicator = document.getElementById('carromTurnIndicator');
+        if (isWaitingOrReady && carromTurnIndicator) {
+            carromTurnIndicator.textContent = waitingText;
+            carromTurnIndicator.style.color = 'var(--text-muted)';
+        }
+        initCarromCanvas();
     }
 }
 
@@ -1156,6 +1172,8 @@ function updateGameState(gameState, events) {
         renderCallBridge(gameState, events);
     } else if (type === 'TWENTY_NINE') {
         renderTwentyNine(gameState, events);
+    } else if (type === 'CARROM') {
+        renderCarrom(gameState);
     }
 }
 

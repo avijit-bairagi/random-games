@@ -104,6 +104,11 @@ function updateMaxPlayersOptions() {
         el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
     } else if (val === 'TWENTY_NINE') {
         el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
+    } else if (val === 'CARROM') {
+        el.maxPlayersInput.innerHTML = `
+            <option value="2" selected>2 Players</option>
+            <option value="4">4 Players</option>
+        `;
     }
     const cbGroup = document.getElementById('cbWinConditionGroup');
     if (cbGroup) cbGroup.style.display = val === 'CALL_BRIDGE' ? 'block' : 'none';
@@ -171,6 +176,17 @@ function formatGameEvent(evt) {
         logEvent(`🔄 Round ${evt.payload.round} finished!`, 'important');
     } else if (evt.eventType === 'CARDS_DEALT') {
         logEvent(`🃏 Cards dealt for round ${evt.payload.round}`);
+    } else if (evt.eventType === 'CARROM_STRIKE') {
+        const pts = evt.payload.pointsScored;
+        const pocketed = (evt.payload.pocketedTypes || []).join(', ');
+        const extra = evt.payload.extraTurn ? ' (Extra turn!)' : '';
+        if (evt.payload.pocketedStriker) {
+            logEvent(`🎯 Strike! Striker pocketed — penalty!`, 'error');
+        } else if (pocketed) {
+            logEvent(`🎯 Strike! Pocketed: ${pocketed}. Points: ${pts > 0 ? '+' : ''}${pts}${extra}`, pts > 0 ? 'important' : 'normal');
+        } else {
+            logEvent(`🎯 Strike! No pieces pocketed.`);
+        }
     } else if (evt.eventType === 'PLAYER_FORFEIT') {
         logEvent(`🚪 A player forfeited the game.`, 'error');
     } else if (evt.eventType === 'BID_PASSED') {

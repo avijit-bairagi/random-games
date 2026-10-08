@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/css/games/chess.css">
     <link rel="stylesheet" href="/css/games/callbridge.css">
     <link rel="stylesheet" href="/css/games/twentynine.css">
+    <link rel="stylesheet" href="/css/games/carrom.css">
     <link rel="stylesheet" href="/css/common/modal.css">
     <link rel="stylesheet" href="/css/responsive.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,6 +91,13 @@
                             <span class="game-chip-players">4 Players</span>
                         </div>
                     </div>
+                    <div class="welcome-game-chip">
+                        <span class="game-chip-icon">🎯</span>
+                        <div class="game-chip-details">
+                            <span class="game-chip-name">Carrom</span>
+                            <span class="game-chip-players">2 or 4 Players</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-container welcome-form">
@@ -115,6 +123,7 @@
                         <button class="tab-btn" data-game="CHESS">♟️ Chess</button>
                         <button class="tab-btn" data-game="CALL_BRIDGE">♠️ Call Bridge</button>
                         <button class="tab-btn" data-game="TWENTY_NINE">🃏 Twenty-Nine</button>
+                        <button class="tab-btn" data-game="CARROM">🎯 Carrom</button>
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
@@ -431,6 +440,22 @@
                             </div>
                         </div>
 
+                        <!-- Carrom Board -->
+                        <div id="carromBoardContainer" class="board-container carrom-container" style="display: none;">
+                            <div class="carrom-header">
+                                <div class="carrom-turn-indicator" id="carromTurnIndicator">⏳ Waiting for game to start...</div>
+                                <div class="carrom-my-color-badge" id="carromMyColorBadge" style="display: none;">You are playing as <span id="carromMyColorText" class="carrom-color-highlight black">BLACK</span></div>
+                                <span class="carrom-queen-badge" id="carromQueenBadge" style="display: none;">👑 Queen Pocketed</span>
+                            </div>
+                            <div class="carrom-canvas-wrapper">
+                                <canvas id="carromCanvas" width="520" height="520"></canvas>
+                            </div>
+                            <div class="carrom-controls">
+                                <div class="carrom-drag-hint" id="carromDragHint" style="display:none;">👆 Click &amp; drag the striker backward, then release to shoot</div>
+                            </div>
+                            <div class="carrom-scoreboard" id="carromScoreboard"></div>
+                        </div>
+
                         <!-- Twenty-Nine (29) Board -->
                         <div id="twentyNineBoardContainer" class="board-container tn-container" style="display: none;">
                             <div class="tn-header-bar">
@@ -587,6 +612,7 @@
                             <option value="CHESS">♟️ Chess (2 Players)</option>
                             <option value="CALL_BRIDGE">♠️ Call Bridge (4 Players)</option>
                             <option value="TWENTY_NINE">🃏 Twenty-Nine / 29 (4 Players)</option>
+                            <option value="CARROM">🎯 Carrom (2 or 4 Players)</option>
                         </select>
                     </div>
                     <div class="input-group" id="maxPlayersGroup">
@@ -712,6 +738,7 @@
     <script src="/js/games/snake.js"></script>
     <script src="/js/games/callbridge.js"></script>
     <script src="/js/games/twentynine.js"></script>
+    <script src="/js/games/carrom.js"></script>
     <script src="/js/common/lobby.js"></script>
 </body>
 </html>
