@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/css/games/ludo.css">
     <link rel="stylesheet" href="/css/games/snake.css">
     <link rel="stylesheet" href="/css/games/chess.css">
+    <link rel="stylesheet" href="/css/games/carrom.css">
     <link rel="stylesheet" href="/css/games/callbridge.css">
     <link rel="stylesheet" href="/css/games/twentynine.css">
     <link rel="stylesheet" href="/css/common/modal.css">
@@ -115,6 +116,7 @@
                         <button class="tab-btn" data-game="CHESS">♟️ Chess</button>
                         <button class="tab-btn" data-game="CALL_BRIDGE">♠️ Call Bridge</button>
                         <button class="tab-btn" data-game="TWENTY_NINE">🃏 Twenty-Nine</button>
+                        <button class="tab-btn" data-game="CARROM">🎯 Carrom</button>
                     </div>
                     <div class="lobby-actions">
                         <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
@@ -542,6 +544,105 @@
                             </div>
                         </div>
 
+                        <!-- Carrom Board -->
+                        <div id="carromBoardContainer" class="board-container carrom-board-container" style="display: none;">
+                            <div class="carrom-header">
+                                <div class="carrom-turn-row">
+                                    <div class="turn-indicator" id="carromTurnIndicator">⏳ Waiting for game to start...</div>
+                                    <div id="carromMyColorBadge" class="my-side-badge" style="display: none;">You are playing as <span id="carromMyColorText" class="color-highlight">BLACK</span></div>
+                                </div>
+                            </div>
+
+                            <div class="carrom-layout">
+                                <!-- Canvas -->
+                                <div class="carrom-canvas-wrap">
+                                    <canvas id="carromCanvas"></canvas>
+
+                                    <!-- Controls panel (shown only on your turn) -->
+                                    <div class="carrom-controls-panel" id="carromControlsPanel" style="display: none;">
+                                        <div class="carrom-controls-title">🎯 Your Strike Controls</div>
+
+                                        <div class="carrom-slider-group">
+                                            <div class="carrom-slider-label">
+                                                Striker Position
+                                                <span id="carromStrikerXVal">0</span>
+                                            </div>
+                                            <input type="range" class="carrom-slider" id="carromStrikerXSlider"
+                                                   min="0" max="100" value="50"
+                                                   oninput="carromOnStrikerXChange(this.value)">
+                                        </div>
+
+                                        <div class="carrom-slider-group">
+                                            <div class="carrom-slider-label">
+                                                Aim Angle
+                                                <span id="carromAngleVal">0°</span>
+                                            </div>
+                                            <input type="range" class="carrom-slider" id="carromAngleSlider"
+                                                   min="-45" max="45" value="0"
+                                                   oninput="carromOnAngleChange(this.value)">
+                                        </div>
+
+                                        <div class="carrom-controls-row">
+                                            <div class="carrom-slider-group carrom-power-bar-wrap">
+                                                <div class="carrom-slider-label">
+                                                    Power
+                                                    <span id="carromPowerPct">60%</span>
+                                                </div>
+                                                <input type="range" class="carrom-slider" id="carromPowerSlider"
+                                                       min="5" max="100" value="60"
+                                                       oninput="carromOnPowerChange(this.value)">
+                                            </div>
+                                            <button class="carrom-strike-btn" id="carromStrikeBtn" onclick="carromStrike()">⚡ Strike!</button>
+                                        </div>
+
+                                        <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;">💡 Drag the striker on the board to position it &bull; Move mouse to aim</p>
+                                    </div>
+                                </div>
+
+                                <!-- Info panel -->
+                                <div class="carrom-info-panel">
+                                    <!-- Scores -->
+                                    <div class="carrom-score-card">
+                                        <div class="carrom-score-title">📊 Score</div>
+                                        <div class="carrom-score-row" id="carromP1Row">
+                                            <div class="carrom-score-name">
+                                                <div class="carrom-score-dot" id="carromP1Dot"></div>
+                                                <span id="carromP1Name">Player 1</span>
+                                            </div>
+                                            <div class="carrom-score-count" id="carromP1Score">0</div>
+                                        </div>
+                                        <div class="carrom-score-row" id="carromP2Row">
+                                            <div class="carrom-score-name">
+                                                <div class="carrom-score-dot" id="carromP2Dot"></div>
+                                                <span id="carromP2Name">Player 2</span>
+                                            </div>
+                                            <div class="carrom-score-count" id="carromP2Score">0</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pocketed coins visual -->
+                                    <div class="carrom-score-card">
+                                        <div class="carrom-score-title">Pocketed Coins</div>
+                                        <div style="margin-bottom:0.35rem;font-size:0.78rem;color:var(--text-muted);">P1</div>
+                                        <div class="carrom-pocketed-row" id="carromP1Pips"></div>
+                                        <div style="margin:0.4rem 0 0.35rem;font-size:0.78rem;color:var(--text-muted);">P2</div>
+                                        <div class="carrom-pocketed-row" id="carromP2Pips"></div>
+                                    </div>
+
+                                    <!-- Queen status -->
+                                    <div class="carrom-queen-card">
+                                        <div class="carrom-score-title">Queen</div>
+                                        <div id="carromQueenStatus" style="font-size:0.85rem;">♛ Queen on board</div>
+                                    </div>
+
+                                    <!-- Last strike message -->
+                                    <div class="carrom-message-card">
+                                        <div id="carromLastMessage"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </section>
@@ -587,6 +688,7 @@
                             <option value="CHESS">♟️ Chess (2 Players)</option>
                             <option value="CALL_BRIDGE">♠️ Call Bridge (4 Players)</option>
                             <option value="TWENTY_NINE">🃏 Twenty-Nine / 29 (4 Players)</option>
+                            <option value="CARROM">🎯 Carrom (2 Players)</option>
                         </select>
                     </div>
                     <div class="input-group" id="maxPlayersGroup">
@@ -712,6 +814,7 @@
     <script src="/js/games/snake.js"></script>
     <script src="/js/games/callbridge.js"></script>
     <script src="/js/games/twentynine.js"></script>
+    <script src="/js/games/carrom.js"></script>
     <script src="/js/common/lobby.js"></script>
 </body>
 </html>

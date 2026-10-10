@@ -124,6 +124,8 @@ const el = {
     chessPromotionModal: document.getElementById('chessPromotionModal'),
     chessPromotionChoices: document.getElementById('chessPromotionChoices'),
 
+    carromBoardContainer: document.getElementById('carromBoardContainer'),
+
     // Call Bridge
     callBridgeBoardContainer: document.getElementById('callBridgeBoardContainer'),
 
@@ -687,7 +689,8 @@ function formatGameType(gameType) {
         case 'TIC_TAC_TOE': return 'Tic Tac Toe';
         case 'LUDO': return 'Ludo';
         case 'SNAKE': return 'Snake and Ladder';
-        case 'CHESS': return 'Chess';
+        case 'CHESS':       return 'Chess';
+        case 'CARROM':      return 'Carrom';
         case 'CALL_BRIDGE': return 'Call Bridge';
         case 'TWENTY_NINE': return 'Twenty-Nine (29)';
         default: return gameType;
@@ -700,7 +703,8 @@ function getGameIcon(gameType) {
         case 'TIC_TAC_TOE': return '❌';
         case 'LUDO': return '🎲';
         case 'SNAKE': return '🐍';
-        case 'CHESS': return '♟️';
+        case 'CHESS':       return '♟️';
+        case 'CARROM':      return '🎯';
         case 'CALL_BRIDGE': return '♠️';
         case 'TWENTY_NINE': return '🃏';
         default: return '🎮';
@@ -729,6 +733,8 @@ function updateGameDetailsBox(room, gameState) {
             gameDesc = 'Match in progress on 100-tile board. Climb ladders, evade snakes, and roll 6 for bonus rolls.';
         } else if (room.gameType === 'CHESS') {
             gameDesc = 'Chess match in progress. Click a piece to select it, then click a destination square to move.';
+        } else if (room.gameType === 'CARROM') {
+            gameDesc = 'Carrom match in progress. Position the striker, aim, and strike to pocket your coloured coins and the queen.';
         } else if (room.gameType === 'CALL_BRIDGE') {
             gameDesc = 'Call Bridge match in progress. Bid your tricks, then play cards to win rounds.';
         } else if (room.gameType === 'TWENTY_NINE') {
@@ -914,6 +920,9 @@ function updateRoomState(room) {
         updateGameState(room.gameStateSummary);
     } else if (room.gameType === 'CHESS') {
         renderChess({ status: room.status, details: {} });
+    } else if (room.gameType === 'CARROM') {
+        initCarromCanvas();
+        renderCarrom({ status: room.status, details: {} });
     } else if (room.gameType === 'CALL_BRIDGE') {
         renderCallBridge({ status: room.status, details: { totalRounds: room.configuration?.totalRounds || 5, winCondition: room.configuration?.winCondition || 'ROUNDS', pointThreshold: room.configuration?.pointThreshold || 50 } });
     }
@@ -1041,6 +1050,7 @@ function setupGameBoardView(gameType) {
     el.ludoBoardContainer.style.display = 'none';
     el.snakeBoardContainer.style.display = 'none';
     el.chessBoardContainer.style.display = 'none';
+    if (el.carromBoardContainer) el.carromBoardContainer.style.display = 'none';
     if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'none';
     if (el.twentyNineBoardContainer) el.twentyNineBoardContainer.style.display = 'none';
 
@@ -1078,6 +1088,14 @@ function setupGameBoardView(gameType) {
             el.chessTurnIndicator.style.color = 'var(--text-muted)';
         }
         initChessBoard();
+    } else if (gameType === 'CARROM') {
+        if (el.carromBoardContainer) el.carromBoardContainer.style.display = 'flex';
+        const carromTurnEl = document.getElementById('carromTurnIndicator');
+        if (isWaitingOrReady && carromTurnEl) {
+            carromTurnEl.textContent = waitingText;
+            carromTurnEl.style.color = 'var(--text-muted)';
+        }
+        initCarromCanvas();
     } else if (gameType === 'CALL_BRIDGE') {
         if (el.callBridgeBoardContainer) el.callBridgeBoardContainer.style.display = 'flex';
         const cbTurnIndicator = document.getElementById('cbTurnIndicator');
@@ -1152,6 +1170,8 @@ function updateGameState(gameState, events) {
         renderSnake(gameState, events);
     } else if (type === 'CHESS') {
         renderChess(gameState);
+    } else if (type === 'CARROM') {
+        renderCarrom(gameState);
     } else if (type === 'CALL_BRIDGE') {
         renderCallBridge(gameState, events);
     } else if (type === 'TWENTY_NINE') {

@@ -1,0 +1,344 @@
+/* ======================== CARROM STYLES ======================== */
+
+.carrom-board-container {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    position: relative;
+}
+
+/* ---- Header ---- */
+.carrom-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+}
+
+/* ---- Layout: board + side panel ---- */
+.carrom-layout {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ---- Canvas wrapper ---- */
+.carrom-canvas-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#carromCanvas {
+    border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 0 3px #5c3416;
+    cursor: crosshair;
+    max-width: 100%;
+    height: auto;
+    display: block;
+    touch-action: none;
+}
+
+/* ---- Score / info panel ---- */
+.carrom-info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 190px;
+    max-width: 230px;
+}
+
+.carrom-score-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+}
+
+.carrom-score-title {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.6rem;
+}
+
+.carrom-score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    font-size: 0.88rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.carrom-score-row:last-child { border-bottom: none; }
+
+.carrom-score-name {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.carrom-score-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.carrom-score-dot.black { background: #333; border: 1px solid #666; }
+.carrom-score-dot.white { background: #e8d5a3; border: 1px solid #aaa; }
+
+.carrom-score-count {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Queen status card */
+.carrom-queen-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+}
+
+/* Last message card */
+.carrom-message-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Pocketed preview */
+.carrom-pocketed-preview {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.65rem 1rem;
+}
+
+.carrom-pocketed-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    min-height: 1.5rem;
+}
+
+.carrom-mini-coin {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.carrom-mini-coin.black { background: radial-gradient(circle at 35% 35%, #555, #111); border: 1px solid #555; }
+.carrom-mini-coin.white { background: radial-gradient(circle at 35% 35%, #fff, #ddd); border: 1px solid #aaa; }
+.carrom-mini-coin.queen { background: radial-gradient(circle at 35% 35%, #f77, #c11); border: 1px solid #a00; }
+
+/* ---- Controls panel ---- */
+.carrom-controls-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    width: 100%;
+    max-width: 580px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.carrom-controls-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.carrom-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.carrom-slider-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.carrom-slider-label span {
+    font-weight: 700;
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+}
+
+.carrom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 4px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.carrom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.6);
+    transition: transform 0.1s;
+}
+
+.carrom-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.carrom-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.6);
+}
+
+.carrom-controls-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ---- Strike button ---- */
+.carrom-strike-btn {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem 2rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.carrom-strike-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.55);
+}
+
+.carrom-strike-btn:active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
+}
+
+.carrom-strike-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ---- Power bar ---- */
+.carrom-power-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+/* Waiting state */
+.carrom-waiting-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.carrom-waiting-text {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem;
+}
+
+/* ---- Turn indicator (shared .turn-indicator class) ---- */
+.carrom-turn-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ---- Foul badge ---- */
+.carrom-foul-badge {
+    display: inline-block;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+    .carrom-info-panel {
+        max-width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .carrom-score-card,
+    .carrom-queen-card,
+    .carrom-message-card {
+        flex: 1 1 140px;
+    }
+
+    .carrom-controls-panel {
+        border-radius: 10px;
+    }
+}

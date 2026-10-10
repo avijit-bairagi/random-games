@@ -104,6 +104,8 @@ function updateMaxPlayersOptions() {
         el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
     } else if (val === 'TWENTY_NINE') {
         el.maxPlayersInput.innerHTML = `<option value="4" selected>4 Players</option>`;
+    } else if (val === 'CARROM') {
+        el.maxPlayersInput.innerHTML = `<option value="2" selected>2 Players</option>`;
     }
     const cbGroup = document.getElementById('cbWinConditionGroup');
     if (cbGroup) cbGroup.style.display = val === 'CALL_BRIDGE' ? 'block' : 'none';
